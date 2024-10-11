@@ -20,7 +20,6 @@
 #   de 2 (10 palabras) y 2.43 (12 palabras) minutos de duracion respectivamente.
 #       
 
-# Cargo el dataset
 import scipy.io
 import matplotlib.pyplot as plt
 import os
@@ -30,7 +29,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report
 
-def extraer_eeg (ruta_entrada):
+def arreglar_eeg (ruta_entrada):
     ruta_salida = os.path.join('Datos', 'Solo_ordenados')
     if not os.path.exists(ruta_salida):
         os.makedirs(ruta_salida)
@@ -66,40 +65,51 @@ def extraer_eeg (ruta_entrada):
                 modalidad.append(int(i[6*n]) - 1)
                 estimulo.append(int(i[6*n + 1]) - 1)
                 artefacto.append(int(i[6*n + 2]) - 1)
-            datos = np.array([F3, F4, C3, C4, P3, P4]).T
+            datos = np.array([F3, F4, C3, C4, P3, P4])
             etiquetas = np.array([modalidad, estimulo, artefacto])
             np.save(ruta_datos, datos)
             np.save(ruta_etiquetas, etiquetas)
+            print('Datos del sujeto extraidos correctamente.')
         else:
             print('Los datos de este sujeto ya fueron extraidos, no se reescribiran.')
-        print('Datos del sujeto extraidos correctamente.')
     print('Extraccion total finalizada')
     return
 
-def graficar (sujeto, ruta, mod = 0):
+def extraer (sujeto, ruta = '.'):
     sujeto = str(sujeto)
     if len(sujeto) == 1:
         sujeto = '0' + sujeto
-    ruta_datos = 'Datos/' + ruta + '/' + sujeto + '_datos.npy'
-    ruta_etiquetas = 'Datos/' + ruta + '/' + sujeto + '_etiquetas.npy'
-    datos = np.load(ruta_datos)
-    etiquetas = np.load(ruta_etiquetas)
-    print(datos)
-    print(type(datos), datos.shape)
-    F3 = datos[:,0]
-    F4 = datos[:,1]
-    C3 = datos[:,2]
-    C4 = datos[:,3]
-    P3 = datos[:,4]
-    P4 = datos[:,5]
-    modalidad = etiquetas[0]
-    estimulo = etiquetas[1]
-    artefacto = etiquetas[2]
+    ruta = ruta + '/Base de Datos Habla Imaginada/S' + sujeto + '/S' + sujeto + '_EEG.mat'
+    data = scipy.io.loadmat(ruta)
+    EEG = data['EEG']
+    return(EEG)
+
+def graficar (sujeto, ruta, mod = 0):
+    data = extraer(sujeto, ruta)
     n = 4096
     modalidad_posible = ['Imaginada', 'Pronunciada']
-    estimulo_posible = ['A', 'E', 'I', 'O', 'U', 'Arriba', 'Abajo',
-                  'Adelante', 'Atras', 'Derecha', 'Izquierda']
+    estimulo_posible = ['A', 'E', 'I', 'O', 'U', 'Arriba', 'Abajo', 'Adelante', 'Atras', 'Derecha', 'Izquierda']
     artefacto_posible = ['Ninguno', 'Parpadeo']
+    F3 = []
+    F4 = []
+    C3 = []
+    C4 = []
+    P3 = []
+    P4 = []
+    modalidad = []
+    estimulo = []
+    artefacto = []
+    for i in data:
+        for j in range(0, n):
+            F3.append(i[j])
+            F4.append(i[j + n])
+            C3.append(i[j + 2*n])
+            C4.append(i[j + 3*n])
+            P3.append(i[j + 4*n])
+            P4.append(i[j + 5*n])
+        modalidad.append(int(i[6*n]) - 1)
+        estimulo.append(int(i[6*n + 1]) - 1)
+        artefacto.append(int(i[6*n + 2]) - 1)
     plt.plot(F3, label = 'F3')
     plt.plot(F4, label = 'F4')
     plt.plot(C3, label = 'C3')
@@ -112,12 +122,55 @@ def graficar (sujeto, ruta, mod = 0):
         i = 0
         while i < len(estimulo):
             pos = estimulo[i]
-            print(estimulo[i])
-            plt.axvspan(i*n, n*(i + 1), alpha = 0.3, color = colores[pos])
+            plt.axvspan(i*n, n*(i + 1), alpha = 0.15, color = colores[pos])
             i += 1
-    plt.legend()
+    # Modo oscuro
+    ax = plt.gca()
+    ax.set_facecolor('black')
+    plt.gcf().set_facecolor('black')
+    ax.spines['bottom'].set_color('white')
+    ax.spines['left'].set_color('white')
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    plt.xlabel('Muestras', fontsize=12, color = 'white')
+    plt.ylabel('Valor', fontsize=12, color = 'white')
+    plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=6, facecolor='black', edgecolor='white', labelcolor='white')
+    plt.tight_layout()
     plt.show()
 
-# extraer_eeg('imagined_speech')
-graficar(1, 'Solo_ordenados', 1)
+def ordenar (sujeto, ruta = '.'):
+    data = extraer(sujeto, ruta)
+    n = 4096
+    datos = []
+    etiquetas = []
+    for i in data:
+        bloque = np.array([i[0:n], i[n:2*n], i[2*n:3*n], i[3*n:4*n], i[4*n:5*n], i[5*n:6*n]]).T
+        etiquetas.append([i[6*n], i[6*n + 1], i[6*n + 2]])
+        datos.append(bloque)
+    datos = np.array(datos)
+    etiquetas = np.array(etiquetas)
+    return([datos, etiquetas])
 
+def normalizar_minmax (sujeto, ruta = '.'):
+    data = ordenar(sujeto, ruta)
+    n = 4096
+    datos = []
+    mini = np.min(data[0])
+    maxi = np.max(data[0])
+    for i in data[0]:
+        datos2 = []
+        for j in i:
+            datos1 = []
+            for k in j:
+                datos1.append((k - mini)/(maxi - mini))
+            datos2.append(datos1)
+        datos2 = np.array(datos2)
+        datos.append(datos2)
+    datos = np.array(datos)
+    return([datos, data[1]])
+
+# graficar(1, '.', 1)
+datos = normalizar_minmax(1)
+assert len(datos[1][:,1]) == datos[0].shape[0], "Las etiquetas deben coincidir con los datos."
