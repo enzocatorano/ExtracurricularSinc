@@ -24,12 +24,9 @@ import scipy.io
 import matplotlib.pyplot as plt
 import os
 import numpy as np
-from sklearn.linear_model import Perceptron
-from sklearn.model_selection import train_test_split
-from sklearn.neural_network import MLPClassifier
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report
-from sklearn.metrics import accuracy_score
+import torch
+import torch.nn as nn
+import torch.optim as optim
 import random
 
 def importar_funciones (): 
@@ -37,12 +34,9 @@ def importar_funciones ():
     import matplotlib.pyplot as plt
     import os
     import numpy as np
-    from sklearn.linear_model import Perceptron
-    from sklearn.model_selection import train_test_split
-    from sklearn.neural_network import MLPClassifier
-    from sklearn.preprocessing import StandardScaler
-    from sklearn.metrics import classification_report
-    from sklearn.metrics import accuracy_score
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
     import random
 
 def arreglar_eeg (ruta_entrada):
@@ -177,6 +171,7 @@ def normalizar (data, normalizacion = 'minmax'):
     datos = []
     mini = np.min(data[0])
     maxi = np.max(data[0])
+    maxabsi = np.max([abs(mini), abs(maxi)])
     for i in data[0]:
         datos2 = []
         for j in i:
@@ -184,6 +179,8 @@ def normalizar (data, normalizacion = 'minmax'):
             for k in j:
                 if normalizacion == 'minmax':
                     datos1.append((k - mini)/(maxi - mini))
+                elif normalizacion == 'prom0':
+                    datos1.append(k/maxabsi)
             datos2.append(datos1)
         datos2 = np.array(datos2)
         datos.append(datos2)
@@ -227,13 +224,52 @@ def dividir_datos (data, fraccion_entrenamiento, tipo = 'estimulo'):
             k = coef_prueba.index(i)
             coef_prueba = coef_prueba[:k] + coef_prueba[k + 1:]
         datos_entrenamiento.append(data[0][i])
-        etiquetas_entrenamiento.append(data[1][:,x][i])
+        etiquetas_entrenamiento.append(int(data[1][:,x][i] - 1))
     for i in coef_prueba:
         datos_prueba.append(data[0][i])
-        etiquetas_prueba.append(data[1][:,x][i])
+        etiquetas_prueba.append(int(data[1][:,x][i] - 1))
     datos_entrenamiento = np.array(datos_entrenamiento)
     etiquetas_entrenamiento = np.array(etiquetas_entrenamiento)
     datos_prueba = np.array(datos_prueba)
     etiquetas_prueba = np.array(etiquetas_prueba)
     return([[datos_entrenamiento, etiquetas_entrenamiento], [datos_prueba, etiquetas_prueba]])
+
+class MLP(nn.Module):
+    def __init__(self, n_entrada, n_ocultas, n_salida):
+        super(MLP, self).__init__()
+            
+        capas = []
+        j = n_entrada
+        for i in n_ocultas:
+            capas.append(nn.Linear(j, i))
+            capas.append(nn.ReLU())
+            j = i
+        capas.append(nn.Linear(j, n_salida))
+        
+        self.network = nn.Sequential(*capas)
+    
+    def forward(self, x):
+        return self.network(x)
+        
+    def entrenar(modelo, epocas, data, etiq):
+        datos = torch.from_numpy(data).float()
+        etiquetas = torch.from_numpy(etiq).long()
+        print(etiquetas.shape)
+        print(outputs)
+
+        optimizador = optim.Adam(modelo.parameters(), lr = 0.001)
+        criterio = nn.CrossEntropyLoss()
+
+        for epoch in range(epocas):
+            modelo.train()
+            optimizador.zero_grad()
+                
+            outputs = modelo(datos)
+            loss = criterio(outputs, etiquetas)
+                
+            loss.backward()
+            optimizador.step()
+                
+            if epoch % 10 == 0:
+                print(f'Epoch {epoch}/{epocas}, Loss: {loss.item()}')
 
