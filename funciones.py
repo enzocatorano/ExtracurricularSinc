@@ -251,14 +251,13 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.network(x)
         
-    def entrenar(modelo, epocas, data, etiq):
+    def entrenar(modelo, epocas, data, etiq, plotear = 0):
         datos = torch.from_numpy(data).float()
         etiquetas = torch.from_numpy(etiq).long()
-        print(etiquetas.shape)
-        print(outputs)
 
         optimizador = optim.Adam(modelo.parameters(), lr = 0.001)
         criterio = nn.CrossEntropyLoss()
+        perdida = []
 
         for epoch in range(epocas):
             modelo.train()
@@ -270,6 +269,38 @@ class MLP(nn.Module):
             loss.backward()
             optimizador.step()
                 
-            if epoch % 10 == 0:
-                print(f'Epoch {epoch}/{epocas}, Loss: {loss.item()}')
+            if plotear == 1 and epoch % 10 == 0:
+                perdida.append(loss.item())
+        if plotear == 1:
+            plt.plot(range(1,1001, 10), perdida, label = "Pérdida")
+            plt.xlabel("Épocas", fontsize=12, color = 'white')
+            plt.ylabel("Pérdida", fontsize=12, color = 'white')
+            plt.title("Perdida por epocas", fontsize=24, color = 'white')
+            ax = plt.gca()
+            ax.set_facecolor('black')
+            plt.gcf().set_facecolor('black')
+            ax.spines['bottom'].set_color('white')
+            ax.spines['left'].set_color('white')
+            ax.xaxis.label.set_color('white')
+            ax.yaxis.label.set_color('white')
+            ax.tick_params(axis='x', colors='white')
+            ax.tick_params(axis='y', colors='white')
+            plt.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8, facecolor='black', edgecolor='white', labelcolor='white')
+            plt.tight_layout()
+            plt.show()
 
+    def evaluar(modelo, data, etiq):
+        datos = torch.from_numpy(data).float()
+        etiquetas = torch.from_numpy(etiq).long()
+
+        modelo.eval() # Desactiva los gradientes
+
+        with torch.no_grad():
+            outputs = modelo(datos)
+        
+        _, predicciones = torch.max(outputs, 1)
+        
+        precision = (predicciones == etiquetas).sum().item() / len(etiquetas)
+        print('La precision del modelo es del ' + str(round(precision * 100, 5)) + '%.')
+
+        return precision, predicciones

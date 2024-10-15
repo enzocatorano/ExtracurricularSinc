@@ -94,28 +94,12 @@ if 1 == 1:
     
     neuronas_entrada = x_entrenamiento_aplanado.shape[1]
     ocultas = []
-    if prediccion == 'modalidad' or 'artefacto':
+    if prediccion == 'modalidad' or prediccion == 'artefacto':
         neuronas_salida = 2
     elif prediccion == 'estimulo':
         neuronas_salida = 11
 
     modelo = mifu.MLP(neuronas_entrada, ocultas, neuronas_salida)
-    mifu.MLP.entrenar(modelo, 1000, x_entrenamiento_aplanado, e_entrenamiento)
+    mifu.MLP.entrenar(modelo, 1000, x_entrenamiento_aplanado, e_entrenamiento, 1)
 
-    epocas = 1000
-    datos = torch.from_numpy(x_entrenamiento_aplanado).float()
-    etiquetas = torch.from_numpy(e_entrenamiento).long()
-    print(etiquetas.shape)
-    print(datos.shape)
-    optimizador = optim.Adam(modelo.parameters(), lr = 0.001)
-    criterio = nn.CrossEntropyLoss()
-
-    for epoch in range(epocas):
-        modelo.train()
-        optimizador.zero_grad()
-        outputs = modelo(datos)
-        loss = criterio(outputs, etiquetas) # aca esta el error
-        loss.backward()
-        optimizador.step()
-        if epoch % 10 == 0:
-            print(f'Epoch {epoch}/{epocas}, Loss: {loss.item()}')
+    precision, predicciones = mifu.MLP.evaluar(modelo, x_prueba_aplanado, e_prueba)
