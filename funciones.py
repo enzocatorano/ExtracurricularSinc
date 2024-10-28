@@ -28,6 +28,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import random
+import math
 
 def importar_funciones (): 
     import scipy.io
@@ -38,6 +39,7 @@ def importar_funciones ():
     import torch.nn as nn
     import torch.optim as optim
     import random
+    import math
 
 def arreglar_eeg (ruta_entrada):
     importar_funciones()
@@ -270,11 +272,11 @@ class MLP(nn.Module):
             optimizador.step()
                 
             if plotear == 1 and epoch % 10 == 0:
-                perdida.append(loss.item())
+                perdida.append(math.log(loss.item()))
         if plotear == 1:
-            plt.plot(range(1,1001, 10), perdida, label = "Pérdida")
+            plt.plot(range(1,epocas + 1, 10), perdida, label = "Pérdida")
             plt.xlabel("Épocas", fontsize=12, color = 'white')
-            plt.ylabel("Pérdida", fontsize=12, color = 'white')
+            plt.ylabel("Pérdida (logaritmica)", fontsize=12, color = 'white')
             plt.title("Perdida por epocas", fontsize=24, color = 'white')
             ax = plt.gca()
             ax.set_facecolor('black')
