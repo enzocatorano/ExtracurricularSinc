@@ -29,6 +29,8 @@ import torch.nn as nn
 import torch.optim as optim
 import random
 import math
+import datetime
+import csv
 
 def importar_funciones (): 
     import scipy.io
@@ -40,6 +42,8 @@ def importar_funciones ():
     import torch.optim as optim
     import random
     import math
+    import datetime
+    import csv
 
 def arreglar_eeg (ruta_entrada):
     importar_funciones()
@@ -174,18 +178,33 @@ def normalizar (data, normalizacion = 'minmax'):
     mini = np.min(data[0])
     maxi = np.max(data[0])
     maxabsi = np.max([abs(mini), abs(maxi)])
-    for i in data[0]:
-        datos2 = []
-        for j in i:
-            datos1 = []
-            for k in j:
-                if normalizacion == 'minmax':
+
+    if normalizacion == 'minmax':
+        mini = np.min(data[0])
+        maxi = np.max(data[0])
+        for i in data[0]:
+            datos2 = []
+            for j in i:
+                datos1 = []
+                for k in j:
                     datos1.append((k - mini)/(maxi - mini))
-                elif normalizacion == 'prom0':
+                datos2.append(datos1)
+            datos2 = np.array(datos2)
+            datos.append(datos2)
+    elif normalizacion == 'prom0':
+        mini = np.min(data[0])
+        maxi = np.max(data[0])
+        maxabsi = np.max([abs(mini), abs(maxi)])
+        for i in data[0]:
+            datos2 = []
+            for j in i:
+                datos1 = []
+                for k in j:
                     datos1.append(k/maxabsi)
-            datos2.append(datos1)
-        datos2 = np.array(datos2)
-        datos.append(datos2)
+                datos2.append(datos1)
+            datos2 = np.array(datos2)
+            datos.append(datos2)
+
     datos = np.array(datos)
     return([datos, data[1]])
 
@@ -201,6 +220,7 @@ def contar_etiquetas (data, tipo = 'estimulo'):
         cantidad[x][int(i) - 1] += 1
         indices[x][int(i) - 1].append(j)
         j += 1
+    # print(str(posibles[x]) + '=' + str(cantidad[x]))
     return([cantidad[x], indices[x]])
 
 def dividir_datos (data, fraccion_entrenamiento, tipo = 'estimulo'):
@@ -253,13 +273,16 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.network(x)
         
-    def entrenar(modelo, epocas, data, etiq, plotear = 0):
+    def entrenar(modelo, epocas, data, etiq, plotear, tolerancia, lr = 0.001):
         datos = torch.from_numpy(data).float()
         etiquetas = torch.from_numpy(etiq).long()
 
-        optimizador = optim.Adam(modelo.parameters(), lr = 0.001)
+        optimizador = optim.Adam(modelo.parameters(), lr)
         criterio = nn.CrossEntropyLoss()
         perdida = []
+        vec_epoca = []
+        minima_perdida = float('inf')
+        contador = 0
 
         for epoch in range(epocas):
             modelo.train()
@@ -270,13 +293,26 @@ class MLP(nn.Module):
                 
             loss.backward()
             optimizador.step()
-                
-            if plotear == 1 and epoch % 10 == 0:
-                perdida.append(math.log(loss.item()))
+            
+            valor_perdida = loss.item()
+            if valor_perdida < minima_perdida - tolerancia:
+                minima_perdida = valor_perdida
+                contador = 0
+            else:
+                contador += 1
+
+            if plotear == 1 and epoch % 5 == 0:
+                perdida.append(loss.item())
+                vec_epoca.append(epoch)
+
+            if contador >= 50:
+                print('Tras ' + str(epoch) + ' epocas, se ejcutó la parada temprana.')
+                break
+
         if plotear == 1:
-            plt.plot(range(1,epocas + 1, 10), perdida, label = "Pérdida")
+            plt.plot(vec_epoca, perdida, label = "Pérdida")
             plt.xlabel("Épocas", fontsize=12, color = 'white')
-            plt.ylabel("Pérdida (logaritmica)", fontsize=12, color = 'white')
+            plt.ylabel("Pérdida", fontsize=12, color = 'white')
             plt.title("Perdida por epocas", fontsize=24, color = 'white')
             ax = plt.gca()
             ax.set_facecolor('black')
@@ -306,3 +342,17 @@ class MLP(nn.Module):
         print('La precision del modelo es del ' + str(round(precision * 100, 5)) + '%.')
 
         return precision, predicciones
+    
+def registrar(precision, error, carac, fecha, hito):
+    ruta = os.path.join('ExtracurricularSinc', 'historial.csv')
+    if os.path.exists(ruta):
+        with open(ruta, mode='a', newline='') as archivo:
+            escritor_csv = csv.writer(archivo)
+            escritor_csv.writerow([precision, error, carac, fecha, hito])
+    else:
+        with open(ruta, mode='w', newline='') as archivo:
+            escritor_csv = csv.writer(archivo)
+            escritor_csv.writerow([precision, error, carac, fecha, hito])
+    print('Se registra:')
+    print(precision, error, carac, fecha, hito)
+    
