@@ -107,7 +107,7 @@ for i in sujeto:
 
 
 ruta = os.path.join('ExtracurricularSinc', 'historial.csv')
-with open(ruta, mode='r', newline='') as archivo:
+with open(ruta, mode='r', newline='', encoding='latin-1') as archivo:
     lector_csv = csv.reader(archivo)
     datos = []
     for i in lector_csv:
@@ -295,3 +295,17 @@ x
 for i in range(len(x)):
     plt.errorbar(x[i][1:], yminmax[i][1:], yerr = eminmax[i][1:], fmt='o', capsize=5)
 plt.show()
+
+# Probemos hacer una transformada de fourier discreta:
+x = []
+y = []
+for i in range(10):
+    x.append(random.random())
+    y.append(random.random())
+plt.scatter(x, y)
+plt.show()
+
+for k in range(len(x)):
+    term = 0
+    for n in range(len(x)):
+        term += 1
