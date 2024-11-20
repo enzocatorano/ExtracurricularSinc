@@ -355,4 +355,18 @@ def registrar(precision, error, carac, fecha, hito):
             escritor_csv.writerow([precision, error, carac, fecha, hito])
     print('Se registra:')
     print(precision, error, carac, fecha, hito)
-    
+
+def grafico_oscuro(ejex = 'x', ejey = 'y', titulo = '', ax = plt.gca()):
+    ax = plt.gca()
+    ax.set_xlabel(ejex, fontsize=12, color = 'white')
+    ax.set_ylabel(ejey, fontsize=12, color = 'white')
+    ax.set_title(titulo, fontsize=24, color = 'white')
+    plt.style.use('dark_background')
+    ax.spines['bottom'].set_color('white')
+    ax.spines['left'].set_color('white')
+    ax.xaxis.label.set_color('white')
+    ax.yaxis.label.set_color('white')
+    ax.tick_params(axis='x', colors='white')
+    ax.tick_params(axis='y', colors='white')
+    ax.legend(loc='best', bbox_to_anchor=(1, 1), fontsize=8, facecolor='black', edgecolor='white', labelcolor='white')
+    plt.tight_layout()

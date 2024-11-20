@@ -296,16 +296,67 @@ for i in range(len(x)):
     plt.errorbar(x[i][1:], yminmax[i][1:], yerr = eminmax[i][1:], fmt='o', capsize=5)
 plt.show()
 
+####################################################################################
 # Probemos hacer una transformada de fourier discreta:
+####################################################################################
 x = []
 y = []
-for i in range(10):
-    x.append(random.random())
-    y.append(random.random())
-plt.scatter(x, y)
+equiespaciado = 0
+N = 5
+if equiespaciado == 1:
+    for i in range(N):
+        x.append(i)
+        y.append(random.random())
+elif equiespaciado == 0:
+    for i in range(N):
+        x.append(random.random())
+        y.append(random.random())
+    x = sorted(x)
+
+dist = []
+for i in range(len(x) - 1):
+    dist.append(x[i + 1] - x[i])
+L0 = min(dist)
+L = (max(x) - min(x)) + L0
+wmax = L/L0
+
+c = 2*math.pi/L
+factor = 1
+Y = []
+for k in range(int(wmax)*factor):
+    R = 0
+    I = 0
+    for j in range(N):
+        R += y[j]*math.cos(-c*k*x[j])
+        I += y[j]*math.sin(-c*k*x[j])
+    Y.append(complex(R,I))
+
+n = 1000
+xp = []
+for i in range(n):
+    xp.append(min(x) + L*i/n)
+funcion = np.zeros(n)
+for i in range(len(Y)):
+    sumx = []
+    for j in xp:
+        sumx.append(Y[i]*(math.cos(c*i*j) + complex(0,1)*math.sin(c*i*j))/len(x))
+    funcion = funcion + np.array(sumx)
+    #plt.plot(xp, sumx)
+
+plt.plot(xp, funcion, label = 'f = 0, 1, ... ' + str(factor*int(wmax - 1)), lw = 4)
+plt.scatter(np.array(x), np.array(y), color = 'white')
+mifu.grafico_oscuro('Tiempo', 'Valor', 'Datos y su reconstruccion mediante transformada de fourier')
 plt.show()
 
-for k in range(len(x)):
-    term = 0
-    for n in range(len(x)):
-        term += 1
+plt.vlines(np.array(range(len(Y))) - L/(10*N), ymin = 0, ymax = np.real(Y), label = 'Componente real', color = 'blue')
+plt.vlines(np.array(range(len(Y))) + L/(10*N), ymin = 0, ymax = np.imag(Y), label = 'Componente imaginaria', color = 'red')
+mifu.grafico_oscuro('Frecuencia', 'Coeficiente', 'Representacion en el espacio de frecuencia de los datos')
+plt.grid(True, lw = 0.1)
+plt.show()
+
+fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
+ax1.plot(range(len(Y)), np.real(Y), label = 'Componente real')
+mifu.grafico_oscuro('Frecuencia', 'Coeficiente real', 'Representacion en el espacio de frecuencia de los datos', ax1)
+ax2.plot(range(len(Y)), np.imag(Y), label = 'Componente imaginaria')
+mifu.grafico_oscuro('Frecuencia', 'Coeficiente imaginario', 'Representacion en el espacio de frecuencia de los datos', ax2)
+plt.show()
