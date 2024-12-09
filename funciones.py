@@ -31,6 +31,7 @@ import random
 import math
 import datetime
 import csv
+from sklearn.model_selection import train_test_split
 
 def importar_funciones (): 
     import scipy.io
@@ -44,6 +45,7 @@ def importar_funciones ():
     import math
     import datetime
     import csv
+    from sklearn.model_selection import train_test_split
 
 def arreglar_eeg (ruta_entrada):
     importar_funciones()
@@ -164,48 +166,21 @@ def ordenar (data):
     datos = []
     etiquetas = []
     for i in data:
-        bloque = np.array([i[0:n], i[n:2*n], i[2*n:3*n], i[3*n:4*n], i[4*n:5*n], i[5*n:6*n]]).T
+        bloque = np.array(i[0:6*n]).T
         etiquetas.append([i[6*n], i[6*n + 1], i[6*n + 2]])
         datos.append(bloque)
     datos = np.array(datos)
     etiquetas = np.array(etiquetas)
     return([datos, etiquetas])
 
-def normalizar (data, normalizacion = 'minmax'):
+def normalizar (data):
     importar_funciones()
-    n = 4096
     datos = []
-    mini = np.min(data[0])
-    maxi = np.max(data[0])
-    maxabsi = np.max([abs(mini), abs(maxi)])
-
-    if normalizacion == 'minmax':
-        mini = np.min(data[0])
-        maxi = np.max(data[0])
-        for i in data[0]:
-            datos2 = []
-            for j in i:
-                datos1 = []
-                for k in j:
-                    datos1.append((k - mini)/(maxi - mini))
-                datos2.append(datos1)
-            datos2 = np.array(datos2)
-            datos.append(datos2)
-    elif normalizacion == 'prom0':
-        mini = np.min(data[0])
-        maxi = np.max(data[0])
-        maxabsi = np.max([abs(mini), abs(maxi)])
-        for i in data[0]:
-            datos2 = []
-            for j in i:
-                datos1 = []
-                for k in j:
-                    datos1.append(k/maxabsi)
-                datos2.append(datos1)
-            datos2 = np.array(datos2)
-            datos.append(datos2)
-
-    datos = np.array(datos)
+    for i in data[0]:
+        max_global = np.max(i)
+        min_global = np.min(i)
+        datos.append((i - min_global) / (max_global - min_global))
+    np.array(datos)
     return([datos, data[1]])
 
 def contar_etiquetas (data, tipo = 'estimulo'):
@@ -220,8 +195,21 @@ def contar_etiquetas (data, tipo = 'estimulo'):
         cantidad[x][int(i) - 1] += 1
         indices[x][int(i) - 1].append(j)
         j += 1
-    # print(str(posibles[x]) + '=' + str(cantidad[x]))
     return([cantidad[x], indices[x]])
+
+def dividir_datos(data, fraccion_entrenamiento, tipo = 'estimulo'):
+    [cantidad, indices] = contar_etiquetas(data, tipo)
+    chico = min(cantidad)
+    ne = int(chico * fraccion_entrenamiento)
+    print('Se usara el ' +  str(int(ne*len(cantidad)*100/sum(cantidad))) + '% para entrenar al modelo.')
+    x = ['modalidad', 'estimulo', 'artefacto'].index(tipo)
+    etiquetas_unicas = np.unique(data[1][:,x])
+    for i in etiquetas_unicas:
+        datos_etiqueta = data[data[1][:,x] == i]
+        etiq_etiqueta = data[data[1][:,x] == i]
+
+        
+        
 
 def dividir_datos (data, fraccion_entrenamiento, tipo = 'estimulo'):
     [cantidad, indices] = contar_etiquetas(data, tipo)
