@@ -51,6 +51,7 @@ def importar_funciones ():
     from sklearn.utils import shuffle
     from scipy.signal import butter, filtfilt
 
+# fuera de uso
 def arreglar_eeg (ruta_entrada):
     importar_funciones()
     ruta_salida = os.path.join('Datos', 'Solo_ordenados')
@@ -108,6 +109,7 @@ def extraer (sujeto, ruta = os.path.dirname(os.getcwd())):
     EEG = data['EEG']
     return(EEG)
 
+# fuera de uso
 def graficar (data, mod = 0):
     importar_funciones()
     n = 4096
@@ -165,6 +167,11 @@ def graficar (data, mod = 0):
     plt.show()
 
 def ordenar (data):
+    ''' Devuelve una lista de forma [datos, etiquetas], donde datos es un array de N mediciones (cambiando estimulo y modalidad).
+     Cada una de las N mediciones esta dada como una concatenacion de los 6 canales de EEG que registraron los datos.
+     Asi, el array de datos tiene dimension N x 24576, donde el segundo valor viene de tener 6 canales con 4096 samples (4 seg. a 1024 Hz).
+     Las etiquetas son un array de dimension N x 3. N mediciones (igual que antes), con 3 etiquetas correspondientes a modalidad,
+     estimulo y presencia de artefactos. '''
     importar_funciones()
     n = 4096
     datos = []
@@ -178,6 +185,8 @@ def ordenar (data):
     return([datos, etiquetas])
 
 def normalizar (data):
+    ''' Realiza normalizacion min-max de forma global, es decir, respecto del valor más grande y más chico
+     de entre todos los valores de la variable tipo array "datos" que arroja la funcion "ordenar". '''
     importar_funciones()
     datos = []
     max_global = np.max(data[0])
