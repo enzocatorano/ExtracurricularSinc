@@ -32,6 +32,8 @@ import math
 import datetime
 import csv
 from sklearn.model_selection import train_test_split
+from sklearn.utils import shuffle
+from scipy.signal import butter, filtfilt
 
 def importar_funciones (): 
     import scipy.io
@@ -46,6 +48,8 @@ def importar_funciones ():
     import datetime
     import csv
     from sklearn.model_selection import train_test_split
+    from sklearn.utils import shuffle
+    from scipy.signal import butter, filtfilt
 
 def arreglar_eeg (ruta_entrada):
     importar_funciones()
@@ -94,12 +98,12 @@ def arreglar_eeg (ruta_entrada):
     print('Extraccion total finalizada')
     return
 
-def extraer (sujeto, ruta = '.'):
+def extraer (sujeto, ruta = os.path.dirname(os.getcwd())):
     importar_funciones()
     sujeto = str(sujeto)
     if len(sujeto) == 1:
         sujeto = '0' + sujeto
-    ruta = ruta + '/Base de Datos Habla Imaginada/S' + sujeto + '/S' + sujeto + '_EEG.mat'
+    ruta = ruta + '/Base_de_Datos_Habla_Imaginada/S' + sujeto + '/S' + sujeto + '_EEG.mat'
     data = scipy.io.loadmat(ruta)
     EEG = data['EEG']
     return(EEG)
@@ -176,12 +180,32 @@ def ordenar (data):
 def normalizar (data):
     importar_funciones()
     datos = []
+    max_global = np.max(data[0])
+    min_global = np.min(data[0])
     for i in data[0]:
-        max_global = np.max(i)
-        min_global = np.min(i)
         datos.append((i - min_global) / (max_global - min_global))
-    np.array(datos)
+    datos = np.array(datos)
     return([datos, data[1]])
+
+def crear_butterworth(tipo, corte_bajo, corte_alto, fs, orden = 4): # crea el filtro
+    nyquist = 0.5 * fs  # Frecuencia de Nyquist
+    bajo = corte_bajo / nyquist
+    alto = corte_alto / nyquist
+    if tipo == 'band':
+        b, a = butter(orden, [bajo, alto], btype = tipo)
+    elif tipo == 'low':
+        b, a = butter(orden, alto, btype = tipo)
+    elif tipo == 'high':
+        b, a = butter(orden, bajo, btype = tipo)
+    return b, a
+
+def filtrar_butterworth(data, tipo, corte_bajo, corte_alto, fs, orden = 4): # aplica el filtro
+    b, a = crear_butterworth(tipo, corte_bajo, corte_alto, fs, orden = orden)
+    datos_filtrados = np.empty_like(data[0])
+    for i in range(data[0].shape[0]): # itera en cada medicion
+        for j in range(6): # itera en cada canal concatenado
+            datos_filtrados[i][j*4096:(j + 1)*4096] = filtfilt(b, a, data[0][i][j*4096:(j + 1)*4096])
+    return([datos_filtrados, data[1]])
 
 def contar_etiquetas (data, tipo = 'estimulo'):
     importar_funciones()
@@ -197,52 +221,27 @@ def contar_etiquetas (data, tipo = 'estimulo'):
         j += 1
     return([cantidad[x], indices[x]])
 
-def dividir_datos(data, fraccion_entrenamiento, tipo = 'estimulo'):
+def dividir_datos(data, fraccion_entrenamiento, tipo, azar = 17):
     [cantidad, indices] = contar_etiquetas(data, tipo)
     chico = min(cantidad)
     ne = int(chico * fraccion_entrenamiento)
     print('Se usara el ' +  str(int(ne*len(cantidad)*100/sum(cantidad))) + '% para entrenar al modelo.')
     x = ['modalidad', 'estimulo', 'artefacto'].index(tipo)
     etiquetas_unicas = np.unique(data[1][:,x])
+    datos_entrenamiento, etiquetas_entrenamiento, datos_prueba, etiquetas_prueba = [], [], [], []
     for i in etiquetas_unicas:
-        datos_etiqueta = data[data[1][:,x] == i]
-        etiq_etiqueta = data[data[1][:,x] == i]
-
-        
-        
-
-def dividir_datos (data, fraccion_entrenamiento, tipo = 'estimulo'):
-    [cantidad, indices] = contar_etiquetas(data, tipo)
-    chico = min(cantidad)
-    ne = int(chico * fraccion_entrenamiento)
-    print('Se usara el ' +  str(int(ne*len(cantidad)*100/sum(cantidad))) + '% para entrenar al modelo.')
-    n = 4096
-    x = ['modalidad', 'estimulo', 'artefacto'].index(tipo)
-    coef = []
-    for i in range(0, len(cantidad)):
-        azar = random.sample(range(0, cantidad[i]), ne)
-        for j in azar:
-            coef.append(indices[i][j])
-    datos_entrenamiento = []
-    datos_prueba = []
-    etiquetas_entrenamiento = []
-    etiquetas_prueba = []
-    coef_prueba = np.arange(0, len(data[1])).tolist()
-    random.shuffle(coef_prueba)
-    for i in coef:
-        if i in coef_prueba:
-            k = coef_prueba.index(i)
-            coef_prueba = coef_prueba[:k] + coef_prueba[k + 1:]
-        datos_entrenamiento.append(data[0][i])
-        etiquetas_entrenamiento.append(int(data[1][:,x][i] - 1))
-    for i in coef_prueba:
-        datos_prueba.append(data[0][i])
-        etiquetas_prueba.append(int(data[1][:,x][i] - 1))
-    datos_entrenamiento = np.array(datos_entrenamiento)
-    etiquetas_entrenamiento = np.array(etiquetas_entrenamiento)
-    datos_prueba = np.array(datos_prueba)
-    etiquetas_prueba = np.array(etiquetas_prueba)
-    return([[datos_entrenamiento, etiquetas_entrenamiento], [datos_prueba, etiquetas_prueba]])
+        datos_etiqueta = data[0][data[1][:,x] == i]
+        etiq_etiqueta = data[1][:,x][data[1][:,x] == i]
+        datos_etiqueta, etiq_etiqueta = shuffle(datos_etiqueta, etiq_etiqueta, random_state = azar)
+        datos_entrenamiento.append(datos_etiqueta[:ne])
+        etiquetas_entrenamiento.append(etiq_etiqueta[:ne])
+        datos_prueba.append(datos_etiqueta[ne:])
+        etiquetas_prueba.append(etiq_etiqueta[ne:])
+    entrenamiento = [np.concatenate(datos_entrenamiento), np.concatenate(etiquetas_entrenamiento)]
+    prueba = [np.concatenate(datos_prueba), np.concatenate(etiquetas_prueba)]
+    entrenamiento[1] = (entrenamiento[1] - 1).astype(int)
+    prueba[1] = (prueba[1] - 1).astype(int)
+    return([entrenamiento, prueba])
 
 class MLP(nn.Module):
     def __init__(self, n_entrada, n_ocultas, n_salida):
@@ -332,7 +331,7 @@ class MLP(nn.Module):
         return precision, predicciones
     
 def registrar(precision, error, carac, fecha, hito):
-    ruta = os.path.join('ExtracurricularSinc', 'historial.csv')
+    ruta = os.path.dirname(os.getcwd()) + '\ExtracurricularSinc\historial.csv'
     if os.path.exists(ruta):
         with open(ruta, mode='a', newline='') as archivo:
             escritor_csv = csv.writer(archivo)

@@ -9,7 +9,7 @@ import random
 import math
 import datetime
 import csv
-import ExtracurricularSinc.funciones as mifu
+import funciones as mifu
 
 sujeto = 1
 prediccion = 'estimulo'
@@ -20,10 +20,10 @@ datos_normalizados = mifu.normalizar(datos_ordenados, 'minmax')
 datos_divididos = mifu.dividir_datos(datos_normalizados, 0.25, prediccion)
 [[x_entrenamiento, e_entrenamiento], [x_prueba, e_prueba]] = datos_divididos
 
-# mifu.graficar(datos, 1)
-# plt.plot(np.concatenate(datos_normalizados[0][:,:,0]))
-# plt.show()
-# plt.plot(datos_normalizados)
+mifu.graficar(datos, 1)
+plt.plot(np.concatenate(datos_normalizados[0][:,:,0]))
+plt.show()
+plt.plot(datos_normalizados)
 
 ###############################################################################################
 # Perceptron simple/multicapa:
@@ -104,7 +104,6 @@ for i in sujeto:
                 carac = 'S' + str(i) + '/' + k + '/' + j + '/' + str([neuronas_entrada] + l + [neuronas_salida]).replace(',','')
                 mifu.registrar(valor, error, carac, fecha, hito)
     print('Listo el sujeto ' + str(i) + '.')
-
 
 ruta = os.path.join('ExtracurricularSinc', 'historial.csv')
 with open(ruta, mode='r', newline='', encoding='latin-1') as archivo:
@@ -301,37 +300,45 @@ plt.show()
 ####################################################################################
 x = []
 y = []
-equiespaciado = 0
-N = 5
+equiespaciado = 1
+L = 1
+N = 100
 if equiespaciado == 1:
     for i in range(N):
-        x.append(i)
+        x.append(i*L/N)
         y.append(random.random())
+    wmax = N
 elif equiespaciado == 0:
     for i in range(N):
         x.append(random.random())
         y.append(random.random())
     x = sorted(x)
-
-dist = []
-for i in range(len(x) - 1):
-    dist.append(x[i + 1] - x[i])
-L0 = min(dist)
-L = (max(x) - min(x)) + L0
-wmax = L/L0
+    dist = []
+    for i in range(len(x) - 1):
+        dist.append(x[i + 1] - x[i])
+    L0 = min(dist)
+    L = (max(x) - min(x)) + L0
+    wmax = L/L0
+# y = []
+# for i in range(N):
+    if i > N/2 and i < 5*N/8 or i < N/5:
+        y.append(1)
+    else:
+        y.append(0)
 
 c = 2*math.pi/L
 factor = 1
+div = 1
 Y = []
-for k in range(int(wmax)*factor):
+for k in range(int(wmax*factor*div)):
     R = 0
     I = 0
     for j in range(N):
-        R += y[j]*math.cos(-c*k*x[j])
-        I += y[j]*math.sin(-c*k*x[j])
+        R += y[j]*math.cos(-c*k/div*x[j])
+        I += y[j]*math.sin(-c*k/div*x[j])
     Y.append(complex(R,I))
 
-n = 1000
+n = int(factor*20*(N + 1))
 xp = []
 for i in range(n):
     xp.append(min(x) + L*i/n)
@@ -339,24 +346,102 @@ funcion = np.zeros(n)
 for i in range(len(Y)):
     sumx = []
     for j in xp:
-        sumx.append(Y[i]*(math.cos(c*i*j) + complex(0,1)*math.sin(c*i*j))/len(x))
+        sumx.append(Y[i]*(math.cos(c*i/div*j) + complex(0,1)*math.sin(c*i/div*j))/(N*factor*div))
     funcion = funcion + np.array(sumx)
     #plt.plot(xp, sumx)
 
-plt.plot(xp, funcion, label = 'f = 0, 1, ... ' + str(factor*int(wmax - 1)), lw = 4)
+plt.plot(xp, funcion, label = 'f = 0, 1, ... ' + str(factor*int(wmax - 1)), lw = 1)
 plt.scatter(np.array(x), np.array(y), color = 'white')
 mifu.grafico_oscuro('Tiempo', 'Valor', 'Datos y su reconstruccion mediante transformada de fourier')
 plt.show()
 
-plt.vlines(np.array(range(len(Y))) - L/(10*N), ymin = 0, ymax = np.real(Y), label = 'Componente real', color = 'blue')
-plt.vlines(np.array(range(len(Y))) + L/(10*N), ymin = 0, ymax = np.imag(Y), label = 'Componente imaginaria', color = 'red')
+plt.vlines(np.array(range(len(Y))) - L/(10*N), ymin = 0, ymax = np.abs(Y), label = '|F(w)|', color = 'blue')
+plt.vlines(np.array(range(len(Y))) + L/(10*N), ymin = 0, ymax = np.arctan(np.imag(Y)/np.real(Y)), label = 'Fase (w)', color = 'red')
 mifu.grafico_oscuro('Frecuencia', 'Coeficiente', 'Representacion en el espacio de frecuencia de los datos')
 plt.grid(True, lw = 0.1)
 plt.show()
 
-fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(8, 6))
-ax1.plot(range(len(Y)), np.real(Y), label = 'Componente real')
-mifu.grafico_oscuro('Frecuencia', 'Coeficiente real', 'Representacion en el espacio de frecuencia de los datos', ax1)
-ax2.plot(range(len(Y)), np.imag(Y), label = 'Componente imaginaria')
-mifu.grafico_oscuro('Frecuencia', 'Coeficiente imaginario', 'Representacion en el espacio de frecuencia de los datos', ax2)
+# Filtrando
+# Aca la idea es eliminar todas aquellas frecuencias menor a un umbral, es decir, que su aporte no sea significativo
+umbral = 2
+Yf = []
+funcion_nueva = np.zeros(n)
+for i in range(int(len(Y))):
+    if np.abs(Y)[i] >= umbral:
+        Yf.append((Y)[i])
+        sumx = []
+        for j in xp:
+            sumx.append(Y[i]*(math.cos(c*i/div*j) + complex(0,1)*math.sin(c*i/div*j))/(N*factor*div))
+        funcion_nueva = funcion_nueva + np.array(sumx)
+        #plt.plot(xp, sumx)
+    else:
+        Yf.append(complex(0, 0))
+
+# Reconstruyamos la señal
+yf = np.zeros(len(x))
+for i in range(len(Yf)):
+    sumx = []
+    for j in x:
+        sumx.append(Yf[i]*(math.cos(c*i/div*j) + complex(0,1)*math.sin(c*i/div*j))/(N*factor*div))
+    yf = yf + np.array(sumx)
+
+plt.scatter(np.array(x), np.array(y), color = 'white')
+plt.scatter(np.array(x), np.array(yf), color = 'red')
+mifu.grafico_oscuro('Tiempo', 'Valor', 'Datos y su reconstruccion por filtrado')
 plt.show()
+
+plt.plot(xp, funcion, label = 'f = 0, 1, ... ' + str(factor*int(wmax - 1)), lw = 1, color = 'red')
+plt.plot(xp, funcion_nueva, label = 'f >= ' + str(umbral), lw = 1, color = 'green')
+plt.scatter(np.array(x), np.array(y), color = 'white')
+mifu.grafico_oscuro('Tiempo', 'Valor', 'Datos, su reconstruccion y filtrado mediante transformada de fourier')
+plt.show()
+
+plt.vlines(np.array(range(len(Yf))) - L/(10*N), ymin = 0, ymax = np.abs(Yf), label = 'Componente real', color = 'blue')
+plt.vlines(np.array(range(len(Yf))) + L/(10*N), ymin = 0, ymax = np.arctan(np.imag(Yf)/np.real(Yf)), label = 'Componente imaginaria', color = 'red')
+mifu.grafico_oscuro('Frecuencia', 'Coeficiente', 'Representacion en el espacio de frecuencia de los datos')
+plt.grid(True, lw = 0.1)
+plt.show()
+
+####################################################################################
+# Quiero ver el espacio de frecuencias de los datos:
+####################################################################################
+fm = 1024
+T = 4
+N = T*fm
+
+sujeto = 1
+
+datos = mifu.extraer(sujeto)
+datos_ordenados = mifu.ordenar(datos)
+datos_normalizados = mifu.normalizar(datos_ordenados)
+
+prediccion = ['modalidad', 'estimulo', 'artefacto'].index('estimulo')
+bloque = random.randint(0, len(datos_normalizados[0]))
+canal = 1
+y = datos_normalizados[0][bloque - 1,:,canal - 1]
+etiqueta = datos_normalizados[1][bloque - 1,prediccion]
+print(etiqueta)
+
+plt.scatter(range(len(y)), y, linewidths = 0)
+mifu.grafico_oscuro('Muestras', 'Registro', 'Canal ' + str(canal) + ', sujeto ' + str(sujeto) + ', bloque ' + str(bloque))
+plt.show()
+
+fft_valores = np.fft.fft(y)
+f = np.fft.fftfreq(N, d = 1/fm)
+magnitud = np.abs(fft_valores)
+fase = np.angle(fft_valores)
+
+plt.figure(figsize=(12, 6))
+plt.subplot(2, 1, 1)
+plt.plot(f[:N // 2], magnitud[:N // 2])
+plt.xlabel('Frecuencia (Hz)')
+plt.ylabel('Magnitud')
+plt.title('Transformada de Fourier - Magnitud')
+plt.subplot(2, 1, 2)
+plt.plot(f[:N // 2], fase[:N // 2])
+plt.xlabel('Frecuencia (Hz)')
+plt.ylabel('Fase (radianes)')
+plt.title('Transformada de Fourier - Fase')
+plt.tight_layout()
+plt.show()
+
