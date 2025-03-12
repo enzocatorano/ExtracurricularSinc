@@ -34,6 +34,7 @@ import csv
 from sklearn.model_selection import train_test_split
 from sklearn.utils import shuffle
 from scipy.signal import butter, filtfilt
+from scipy.signal import stft
 
 def importar_funciones (): 
     import scipy.io
@@ -50,6 +51,7 @@ def importar_funciones ():
     from sklearn.model_selection import train_test_split
     from sklearn.utils import shuffle
     from scipy.signal import butter, filtfilt
+    from scipy.signal import stft
 
 # fuera de uso
 def arreglar_eeg (ruta_entrada):
@@ -234,7 +236,7 @@ def dividir_datos(data, fraccion_entrenamiento, tipo, azar = 17):
     [cantidad, indices] = contar_etiquetas(data, tipo)
     chico = min(cantidad)
     ne = int(chico * fraccion_entrenamiento)
-    print('Se usara el ' +  str(int(ne*len(cantidad)*100/sum(cantidad))) + '% para entrenar al modelo.')
+    print('Se usara el ' +  str(int(ne*len(cantidad)*100/sum(cantidad))) + '% para entrenar al modelo. Son ' + str(ne) + ' datos de c/u.')
     x = ['modalidad', 'estimulo', 'artefacto'].index(tipo)
     etiquetas_unicas = np.unique(data[1][:,x])
     datos_entrenamiento, etiquetas_entrenamiento, datos_prueba, etiquetas_prueba = [], [], [], []
@@ -252,8 +254,70 @@ def dividir_datos(data, fraccion_entrenamiento, tipo, azar = 17):
     prueba[1] = (prueba[1] - 1).astype(int)
     return([entrenamiento, prueba])
 
+def preparar_datos(data, f_entrenamiento = 0.2, etiqueta_objetivo = 1):
+    """Divide datos y etiquetas en entrenamiento y prueba."""
+    datos = data[0]
+    etiquetas = data[1] - 1
+    datos_entrenamiento, datos_prueba, etiquetas_entrenamiento, etiquetas_prueba = train_test_split(
+        datos, etiquetas[:, etiqueta_objetivo], train_size = f_entrenamiento, stratify = etiquetas[:, etiqueta_objetivo]
+    )
+    return [[datos_entrenamiento, etiquetas_entrenamiento], [datos_prueba, etiquetas_prueba]]
+
+def calcular_stft(signal, fs = 1024, window = 'hann', nperseg = 256, noverlap = 128):
+    """
+    Calcula la STFT de una señal EEG.
+    
+    Parámetros:
+    - signal: np.array, señal de EEG a analizar
+    - fs: int, frecuencia de muestreo (Hz)
+    - window: str, tipo de ventana
+    - nperseg: int, tamaño de cada segmento
+    - noverlap: int, solapamiento entre ventanas
+    
+    Retorna:
+    - f: frecuencias
+    - t: tiempos
+    - Zxx: matriz de STFT (espectrograma complejo)
+    """
+    f, t, Zxx = stft(signal, fs = fs, window = window, nperseg = nperseg, noverlap = noverlap)
+    return f, t, Zxx
+
+def convertir_a_stft(datos, fs = 1024, window = 'hann', nperseg = 256, noverlap = 128):
+    f, t, matriz_prueba = calcular_stft(datos[0][0][0:fs*4], fs, window, nperseg, noverlap)
+    reformados = np.zeros((datos[0].shape[0], 6, matriz_prueba.shape[0], matriz_prueba.shape[1])).astype(np.complex128())
+    for i in range(datos[0].shape[0]):
+        for j in range(6):
+            f, t, Zxx = calcular_stft(datos[0][i][j*fs*4:(j+1)*fs*4], fs, window, nperseg, noverlap)
+            reformados[i][j] = Zxx
+    return [reformados, datos[1], [t, f]]
+
+def calcular_potencia_bandas(matriz, f, bandas):
+    '''
+    Calcula la potencia de cada banda especificada para cada ventana temporal del espectrograma.
+    '''
+    salida = {nombre: [] for nombre in bandas.keys()}   # Hace un diccionario con las mismas llaves
+    potencia_espectral = np.abs(matriz) **2
+    for nombre, (f_min, f_max) in bandas.items():
+        mascara = (f > f_min) & (f < f_max)
+        salida[nombre] = np.sum(potencia_espectral[mascara, :], axis = 0)
+    return salida
+
+def convertir_a_potencia_bandas(datos, bandas):
+    data = []
+    for i in datos[0]:
+        aux2 = []
+        for j in i:
+            aux = []
+            dictpb = calcular_potencia_bandas(j, datos[2][1], bandas)
+            for k in dictpb.values():
+                aux.append(k)
+            aux2.append(np.concatenate(np.array(aux)))
+        data.append(np.concatenate(np.array(aux2)))
+    data = np.array(data)
+    return [data, datos[1]]
+
 class MLP(nn.Module):
-    def __init__(self, n_entrada, n_ocultas, n_salida):
+    def __init__(self, n_entrada, n_ocultas, n_salida, dropout_ratio = 0.1):
         super(MLP, self).__init__()
             
         capas = []
@@ -261,6 +325,7 @@ class MLP(nn.Module):
         for i in n_ocultas:
             capas.append(nn.Linear(j, i))
             capas.append(nn.ReLU())
+            capas.append(nn.Dropout(dropout_ratio))
             j = i
         capas.append(nn.Linear(j, n_salida))
         
@@ -366,3 +431,4 @@ def grafico_oscuro(ejex = 'x', ejey = 'y', titulo = '', ax = plt.gca()):
     ax.tick_params(axis='y', colors='white')
     ax.legend(loc='best', bbox_to_anchor=(1, 1), fontsize=8, facecolor='black', edgecolor='white', labelcolor='white')
     plt.tight_layout()
+

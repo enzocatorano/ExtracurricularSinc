@@ -493,3 +493,123 @@
 0.595531914893617,0.010338323926175608,S15/minmax/modalidad/[3072 256 256 2],['31-12-2024'],Señal filtrada a banda correspondiente.
 0.09288793103448276,0.0028994879411796777,S15/minmax/estimulo/[3072 256 256 11],['31-12-2024'],Señal filtrada a banda correspondiente.
 0.5187022900763358,0.0071394340186250425,S15/minmax/artefacto/[3072 256 256 11],['31-12-2024'],Señal filtrada a banda correspondiente.
+0.6079166666666667,0.01631093580957656,S1/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7739583333333333,0.01296721101501539,S1/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.11493445692883895,0.003939862751562706,S1/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.12897940074906367,0.003271176617899678,S1/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5013950892857143,0.005782953404693682,S1/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7424665178571428,0.005547375429115814,S1/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6622287968441815,0.007292402389173496,S2/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.918145956607495,0.006391263016181319,S2/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.10924145299145299,0.0036885508313177595,S2/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.1391559829059829,0.006810336290896615,S2/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6310444874274661,0.02455562987523887,S2/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8573500967117988,0.009683261312621271,S2/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6528571428571428,0.018155110401472812,S3/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8647619047619048,0.004707168405988084,S3/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.13152610441767068,0.005951948916020202,S3/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.13805220883534136,0.00667878247773598,S3/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5154639175257731,0.06148144035652312,S3/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.756701030927835,0.004339004377807431,S3/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6372745490981964,0.014226037382535845,S4/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8474448897795591,0.005798744578056773,S4/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.1315217391304348,0.004004284769635908,S4/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.125,0.0028758166424615117,S4/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5867052023121387,0.014982424764741273,S4/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7721579961464355,0.015387354377014608,S4/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5595114345114345,0.08618320495953855,S5/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.9158004158004158,0.003664675580413739,S5/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.09596238938053098,0.0055615070600418485,S5/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.1172566371681416,0.003547715600607404,S5/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6266066838046273,0.04112464946579569,S5/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8020565552699229,0.005581595355699839,S5/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6098484848484849,0.0169772431342343,S6/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.9684343434343434,0.0032828282828282758,S6/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.11947368421052632,0.004736842105263158,S6/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.14473684210526316,0.005924602110704334,S6/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5444743935309972,0.0068719939536290905,S6/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7284366576819408,0.0061285306285702714,S6/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5223958333333333,0.010287517840251463,S7/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.62890625,0.00862076381908266,S7/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.13163716814159293,0.005898058661985311,S7/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.12057522123893805,0.002251549754863306,S7/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6976799242424242,0.022034494203000757,S7/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.9251893939393938,0.0035612680143636763,S7/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5350667938931297,0.020321571404529646,S8/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8175095419847329,0.009609477091719151,S8/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.10616089613034622,0.006091008030646775,S8/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.1234725050916497,0.004987849421885632,S8/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5326812977099237,0.011588349439369918,S8/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.6393129770992366,0.013818239800953312,S8/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5228119180633147,0.01045599969121338,S9/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7381284916201117,0.010181065050572183,S9/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.1227589641434263,0.0052155148233557665,S9/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.13844621513944222,0.003511372418683287,S9/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5526315789473684,0.011605721075975054,S9/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.6592558983666063,0.015983588887303574,S9/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5260721247563352,0.016855188699338462,S10/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8435672514619883,0.0066283969340815985,S10/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.10399590163934426,0.005089911021484214,S10/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.1326844262295082,0.005249462482561269,S10/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5972222222222221,0.01746965369357616,S10/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7125706214689265,0.01656722063080311,S10/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6402671755725191,0.012388841622139322,S11/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8931297709923665,0.004490095172301147,S11/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.11701030927835052,0.0054377342466603844,S11/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.11237113402061857,0.005700148005998122,S11/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6035925196850394,0.008408938212813336,S11/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.749261811023622,0.007522907829166955,S11/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5840600775193798,0.00930100970644132,S12/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8512596899224806,0.0078529376926797,S12/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.10005307855626328,0.0041782057791477385,S12/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.10164543524416136,0.0032208419829613906,S12/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5335648148148149,0.02160444617101445,S12/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.6634837962962963,0.00873754988776048,S12/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5029469548133596,0.06690280803645873,S13/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8357072691552063,0.007653599476536111,S13/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.11846234309623431,0.006287814177218196,S13/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.13467573221757323,0.0029832681043417387,S13/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5760763209393347,0.01997051155761823,S13/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7729941291585127,0.005485439438174047,S13/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6025046382189239,0.01118543232801092,S14/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.6924860853432282,0.005004734323027221,S14/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.12396907216494846,0.0021847575403750796,S14/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.13556701030927834,0.007043476076729436,S14/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5654276985743381,0.007148414019880226,S14/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.6779531568228105,0.013251920535079247,S14/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.5882056451612903,0.012208763012195138,S15/minmax/modalidad/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.7615927419354839,0.009158182314809138,S15/minmax/modalidad/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.11745689655172413,0.004329544676855061,S15/minmax/estimulo/[3072 256 128 11],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.11072198275862069,0.005150841135538805,S15/minmax/estimulo/[3366 256 128 11],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.6268153526970954,0.008247074369801393,S15/minmax/artefacto/[3072 256 128 2],07-01-2025,Hice un downsampling a 128Hz antes de nnormalizar. Sin filtro. Con dropout.
+0.8389522821576763,0.007571675161640971,S15/minmax/artefacto/[3366 256 128 2],03-03-2025,Uso el modulo cuadrado de los valores de las matrices STFT como imput de los MLP despues de hacer downsampling. Sin filtro. Con dropout.
+0.1327247191011236,0.005372251116090363,S1/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.11538461538461539,0.007121235132654582,S2/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.14006024096385544,0.006369767841591123,S3/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.11875,0.003917731405121963,S4/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.10425884955752213,0.004719882325410775,S5/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.10842105263157895,0.0035362333883623585,S6/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.11393805309734513,0.007432348935717349,S7/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.10743380855397149,0.0045009393379124175,S8/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.1177788844621514,0.0032913229977661936,S9/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.10604508196721311,0.0017640472472473575,S10/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.12886597938144329,0.004442740244182137,S11/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.11518046709129512,0.0046576244094438,S12/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.11218619246861924,0.00560432851691735,S13/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.12164948453608247,0.006331129678999904,S14/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.11745689655172414,0.004113420325088479,S15/minmax/estimulo/[3072 11],05-03-2025,Downsampling pero en perceptron
+0.12523408239700373,0.006235435855675704,S1/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.14636752136752135,0.0037229276305404345,S2/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.13278112449799195,0.004416325813650268,S3/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.13858695652173914,0.004323495587678837,S4/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.11504424778761063,0.0027733768607434007,S5/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.145,0.0029888991293685655,S6/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.1377212389380531,0.005698321659956635,S7/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.12016293279022403,0.002956415687067439,S8/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.15089641434262946,0.0061254112463836234,S9/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.13524590163934425,0.0031934168953851607,S10/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.11211340206185566,0.008668709030382502,S11/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.10429936305732485,0.004737943429744885,S12/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.14722803347280333,0.003422493940867764,S13/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.1350515463917526,0.004105260637633684,S14/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.
+0.11260775862068965,0.004780230158628151,S15/minmax/estimulo/[3366 256 128 11],05-03-2025,Modulo del espectograma STFT sin downsampling ni filtrado.

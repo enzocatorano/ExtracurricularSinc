@@ -20,8 +20,19 @@ datos_normalizados = mifu.normalizar(datos_ordenados, 'minmax')
 datos_divididos = mifu.dividir_datos(datos_normalizados, 0.25, prediccion)
 [[x_entrenamiento, e_entrenamiento], [x_prueba, e_prueba]] = datos_divididos
 
+plt.style.use('dark_background')
+plt.figure(figsize=(16, 3))
+for i in range(6):
+    plt.plot(np.concatenate(datos_ordenados[0][:,(i*4096):((i+1)*4096)]), label = 'Canal ' + str(i+1))
+plt.title("Valores de EEG, sujeto " + str(sujeto))
+plt.xlabel("Sample")
+plt.ylabel("Magnitud")
+plt.legend()
+plt.xlim(-100, np.concatenate(datos_ordenados[0][:,:4096]).shape[0] + 100)
+plt.show()
+
 mifu.graficar(datos, 1)
-plt.plot(np.concatenate(datos_normalizados[0][:,:,0]))
+plt.plot(np.concatenate(datos_normalizados[0][:,0]))
 plt.show()
 plt.plot(datos_normalizados)
 
@@ -445,3 +456,52 @@ plt.title('Transformada de Fourier - Fase')
 plt.tight_layout()
 plt.show()
 
+
+
+####################################################################################
+# Transformada de fourier de tiempo corto:
+####################################################################################
+
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.signal import stft
+
+def compute_stft(signal, fs=1024, window='hann', nperseg=256, noverlap=128):
+    """
+    Calcula la STFT de una señal EEG.
+    
+    Parámetros:
+    - signal: np.array, señal de EEG a analizar
+    - fs: int, frecuencia de muestreo (Hz)
+    - window: str, tipo de ventana
+    - nperseg: int, tamaño de cada segmento
+    - noverlap: int, solapamiento entre ventanas
+    
+    Retorna:
+    - f: frecuencias
+    - t: tiempos
+    - Zxx: matriz de STFT (espectrograma complejo)
+    """
+    f, t, Zxx = stft(signal, fs=fs, window=window, nperseg=nperseg, noverlap=noverlap)
+    return f, t, Zxx
+
+def plot_stft(f, t, Zxx):
+    """Grafica el espectrograma de la STFT."""
+    plt.figure(figsize=(10, 6))
+    plt.pcolormesh(t, f, np.abs(Zxx), shading='gouraud')
+    plt.colorbar(label='Magnitud')
+    plt.ylabel('Frecuencia (Hz)')
+    plt.xlabel('Tiempo (s)')
+    plt.title('STFT - Espectrograma')
+    plt.show()
+
+
+sujeto = random.randint(1, 15)
+datos = mifu.extraer(sujeto)
+datos_ordenados = mifu.ordenar(datos)
+fs = 1024
+dato = random.randint(0, datos_ordenados[0].shape[0] - 1)
+canal = random.randint(0, 5)
+    
+f, t_stft, Zxx = compute_stft(datos_ordenados[0][dato][canal*4096:(canal + 1)*4096], fs = fs)
+plot_stft(f, t_stft, Zxx)
