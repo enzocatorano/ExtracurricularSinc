@@ -11,6 +11,8 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from torch.utils.tensorboard import SummaryWriter
 import matplotlib.pyplot as plt
 import seaborn as sns
+from collections import OrderedDict
+from tqdm import tqdm
 import datetime
 import os
 import copy
@@ -80,22 +82,22 @@ class MLP (nn.Module):
         self.use_batch_norm = usar_batch_norm
         self.dropout_rate = dropout
 
-        # construir bloques secuenciales
-        bloques = []
+        # construir bloques nombrados con OrderedDict
+        bloques = OrderedDict()
         for i in range(len(arq) - 1):
             in_f, out_f = arq[i], arq[i+1]
             # capa lineal
-            bloques.append(nn.Linear(in_f, out_f))
+            bloques[f"linear{i}"] = nn.Linear(in_f, out_f)
             # batchnorm solo en capas ocultas
             if usar_batch_norm and i < len(arq) - 2:
-                bloques.append(nn.BatchNorm1d(out_f))
-            # activación en todas las capas
-            bloques.append(self.func_act[i])
+                bloques[f"batchnorm{i}"] = nn.BatchNorm1d(out_f)
+            # activación
+            bloques[f"act{i}"] = self.func_act[i]
             # dropout solo en capas ocultas
-            if dropout is not None and i < len(arq) - 2:
-                bloques.append(nn.Dropout(dropout))
-        # construyo la estructura total de la red
-        self.estructura_total = nn.Sequential(*bloques)
+            if dropout > 0 and i < len(arq) - 2:
+                bloques[f"dropout{i}"] = nn.Dropout(dropout)
+        # secuencial con nombres legibles
+        self.estructura_total = nn.Sequential(bloques)
 
         # inicializacion de pesos
         if metodo_init_pesos is not None:
@@ -164,7 +166,7 @@ class Entrenador ():
                  device: torch.device = None,
                  parada_temprana: int = None,
                  log_dir: str = 'runs'):
-        
+
         # dispositivo en el que se correra el entrenamiento
         if device is not None and device == 'cuda':
             if torch.cuda.is_available():
@@ -203,7 +205,9 @@ class Entrenador ():
         '''
         self.modelo.train()
         perdida_total = 0.0
-        for x, y in cargador_entrenamiento:
+        for x, y in tqdm(cargador_entrenamiento,
+                         desc=f"Epoca {epoca} Entrenamiento",
+                         leave = False):
             x, y = x.to(self.device), y.to(self.device)
             self.optimizador.zero_grad()
             predicciones = self.modelo(x)
@@ -224,7 +228,9 @@ class Entrenador ():
         perdida_total = 0.0
         correctas = 0
         with torch.no_grad():
-            for x, y in cargador_validacion:
+            for x, y in tqdm(cargador_validacion,
+                         desc=f"Epoca {epoca} ✅ Validación",
+                         leave = False):
                 x, y = x.to(self.device), y.to(self.device)
                 predicciones = self.modelo(x)
                 perdida = self.func_perdida(predicciones, y)
@@ -237,7 +243,7 @@ class Entrenador ():
             self.escritor.add_scalar('Perdida/validacion', perdida_promedio_epoca, epoca)
             self.escritor.add_scalar('Precision/validacion', precision, epoca)
         return perdida_promedio_epoca, precision
-    
+
 
     def ajustar (self,
                  cargador_entrenamiento: DataLoader,
@@ -255,7 +261,9 @@ class Entrenador ():
         mejor_modelo = copy.deepcopy(self.modelo.state_dict())
 
 
-        for epoca in range(1, epocas + 1):
+        for epoca in tqdm(range(1, epocas + 1),
+                          desc = "Entrenamiento total",
+                          unit = "época"):
             perdida_entrenamiento = self._epoca_entrenamiento(cargador_entrenamiento, epoca)
             if cargador_validacion is not None:
                 perdida_validacion, precision = self._epoca_validacion(cargador_validacion, epoca)
@@ -283,10 +291,10 @@ class Entrenador ():
         Registra pesos y gradientes en TensorBoard.
         '''
         for nombre, parametro in self.modelo.named_parameters():
-            self.escritor.add_histogram(f'Pesos_y_Sesgos/{nombre}', parametro.data, epoca)
+            self.escritor.add_histogram(f'Parametros/{nombre}', parametro.data.detach().cpu(), epoca)
             if parametro.grad is not None:
-                self.escritor.add_histogram(f'Gradientes/{nombre}', parametro.grad, epoca)
-    
+                self.escritor.add_histogram(f'Gradientes/{nombre}', parametro.grad.detach().cpu(), epoca)
+
 
     def _revisar_formato_etiquetas (self, preds: torch.Tensor, etiquetas: torch.Tensor):
         '''
@@ -301,8 +309,6 @@ class Entrenador ():
 
 # falta:
 #   la posibilidad de usar regularizacion
-#   que se imprima la evolucion de los aprendibles de batch normalization
-#   pesos y sesgos en batch normalization ?????
 
 
 ############################################################################################################
@@ -313,10 +319,11 @@ class Entrenador ():
 class Evaluador ():
     '''
     Clase para evaluar modelos PyTorch de forma genérica.
+    Requiere que se haya usado la funcion dejar_etiqueta().
     '''
-    def __init__ (self, modelo : nn.Module, clases : str, device : torch.device = None):
+    def __init__ (self, modelo : nn.Module, device : torch.device = None):
 
-        if device is not None and device == 'cuda':
+        if device is None and device == 'cuda':
             if torch.cuda.is_available():
                 self.device = device
                 print('Utilizando GPU.')
@@ -326,24 +333,45 @@ class Evaluador ():
         else:
             self.device = 'cpu'
             print('Se utilizara CPU.')
-            
+
         self.modelo = modelo.to(self.device)
 
-        if clases not in ['modalidad', 'estimulo', 'artefacto']:
-            raise ValueError('clases debe ser una de las siguientes: "modalidad", "estimulo", "artefacto".')
+
+    def revisar_etiqueta (self, cargador):
+        # reviso la existencia de cargador.dataset.etiqueta
+        if not hasattr(cargador.dataset.dataset, 'etiqueta'):
+            raise AttributeError('El dataset no tiene el atributo "etiqueta". Asegurese de haber usado la funcion dejar_etiqueta() en el DataSetEEG.')
+            
+        clases = cargador.dataset.dataset.etiqueta
+        if clases not in ['modalidad',
+                          'estimulo',
+                          'artefacto',
+                          'estimulo_binario',
+                          'estimulo_vocal'
+                          'estimulo_comando']:
+            raise ValueError('clases debe ser una de las siguientes: "modalidad", "estimulo", "artefacto", "estimulo_binario", "estimulo_vocal", "estimulo_comando".')
+        
         self.clases = clases
         if clases == 'modalidad':
             self.nombres_clases = ['Imaginada', 'Pronunciada']
         elif clases == 'estimulo':
-            self.nombres_clases = ['A', 'E', 'I', 'O', 'U', 'Arriba', 'Abajo', 'Adelante', 'Atras', 'Derecha', 'Izquierda']
+            self.nombres_clases = ['A', 'E', 'I', 'O', 'U', 'Arriba', 'Abajo', 'Izquierda', 'Derecha', 'Adelante', 'Atras']
         elif clases == 'artefacto':
             self.nombres_clases = ['Limpio', 'Parpadeo']
+        elif clases == 'estimulo_binario':
+            self.nombres_clases = ['Vocal', 'Comando']
+        elif clases == 'estimulo_vocal':
+            self.nombres_clases = ['A', 'E', 'I', 'O', 'U']
+        elif clases == 'estimulo_comando':
+            self.nombres_clases = ['Arriba', 'Abajo', 'Izquierda', 'Derecha', 'Adelante', 'Atras']
 
 
     def probar (self, dataloader):
         self.modelo.eval()
         todas_preds = []
         todas_verdaderas = []
+
+        self.revisar_etiqueta(dataloader)
 
         with torch.no_grad():
             for x, y in dataloader:
@@ -363,17 +391,17 @@ class Evaluador ():
                 todas_verdaderas.append(verdadera.cpu().numpy())
 
         return np.concatenate(todas_verdaderas), np.concatenate(todas_preds)
-    
 
-    def matriz_confusion(self, dataloader, plot = True, titulo="Matriz de Confusión"):
+
+    def matriz_confusion(self, dataloader, plot = True, titulo = "Matriz de Confusión"):
         verdaderas, preds = self.probar(dataloader)
         cm = confusion_matrix(verdaderas, preds)
         if plot:
             plt.style.use('dark_background')
             plt.figure(figsize=(8, 6))
             sns.heatmap(cm, annot = True, fmt = "d", cmap = "cividis",
-                        xticklabels=self.clases if self.clases else np.unique(verdaderas),
-                        yticklabels=self.clases if self.clases else np.unique(verdaderas))
+                        xticklabels = self.nombres_clases if self.clases else np.unique(verdaderas),
+                        yticklabels = self.nombres_clases if self.clases else np.unique(verdaderas))
             plt.xlabel("Etiqueta predicha")
             plt.ylabel("Etiqueta verdadera")
             plt.title(titulo)
@@ -383,10 +411,10 @@ class Evaluador ():
     
 
     def reporte(self, dataloader):
-        verdaderas, preds = self.predecir(dataloader)
+        verdaderas, preds = self.probar(dataloader)
         print(classification_report(
             verdaderas, preds,
-            target_names=self.clases if self.clases else None,
+            target_names = self.nombres_clases if self.nombres_clases else None,
             digits=3
         ))
 
@@ -409,28 +437,34 @@ class Gestor ():
 class DataSetEEG (Dataset):
     '''
     Carga los datos de EEG, y deja a punto para usar en los modelos Pytorch.
+    Si sujeto es None, se usa un objeto vacío; útil para crear datasets desde arrays.
     '''
-    def __init__ (self, sujeto, ruta_sujetos = '../Base_de_Datos_Habla_Imaginada/'):
+    def __init__ (self, sujeto = None, ruta_sujetos = '../Base_de_Datos_Habla_Imaginada/'):
         '''
         Carga los datos de un sujeto.
         '''
-        self.sujeto = sujeto
-        ruta = ruta_sujetos
-        if sujeto < 10:
-            ruta += f'S0{sujeto}/S0{sujeto}_EEG.mat'
-        else:
-            ruta += f'S{sujeto}/S{sujeto}_EEG.mat'
-        
-        # checkeo y carga
-        try:
-            data = sio.loadmat(ruta, squeeze_me = True, struct_as_record = False)
-        except FileNotFoundError:
-            raise FileNotFoundError(f'No se encontro el archivo en la ruta: {ruta}')
-        EEG = data['EEG']
+        if sujeto is not None:
+            self.sujeto = sujeto
+            ruta = ruta_sujetos
+            if sujeto < 10:
+                ruta += f'S0{sujeto}/S0{sujeto}_EEG.mat'
+            else:
+                ruta += f'S{sujeto}/S{sujeto}_EEG.mat'
+            
+            # checkeo y carga
+            try:
+                data = sio.loadmat(ruta, squeeze_me = True, struct_as_record = False)
+            except FileNotFoundError:
+                raise FileNotFoundError(f'No se encontro el archivo en la ruta: {ruta}')
+            EEG = data['EEG']
 
-        # separando datos de etiquetas
-        self.x = EEG[:, :-3]
-        self.y = EEG[:, -3:]
+            # separando datos de etiquetas
+            self.x = EEG[:, :-3]
+            self.y_completa = EEG[:, -3:].copy()
+            self.y = self.y_completa.copy()
+        else:
+            # para cuando se cree por arrays
+            pass
         
 
     def __len__ (self):
@@ -495,9 +529,22 @@ class DataSetEEG (Dataset):
                     verticalalignment = 'bottom', horizontalalignment = 'left',
                     bbox=dict(fc='black', ec='white'))
         axs[-1].set_xlabel('Tiempo [s]')
-        plt.tight_layout()
         plt.show()
-        
+    
+
+    @classmethod
+    def desde_arrays (cls, x, y, etiqueta):
+        '''
+        Crea un DataSetEEG a partir de arrays numpy x e y (etiquetas).
+        Útil para subdatasets filtrados.
+        '''
+        obj = cls(sujeto = None)
+        obj.x = x
+        obj.y_completa = None
+        obj.y = y
+        obj.etiqueta = etiqueta
+        return obj
+
         
     def particionar (self, ratio_entrenamiento = 0.7, validacion = True, semilla = None):
         if ratio_entrenamiento >= 1 or ratio_entrenamiento <= 0:
@@ -519,6 +566,11 @@ class DataSetEEG (Dataset):
 
 
     def dejar_etiqueta (self, etiqueta : str):
+        '''
+        Mantiene una de las tres etiquetas del dataset
+        (modalidad, estimulo o artefacto), para ser usada
+        en prediccion.
+        '''
         posibles = ['modalidad','estimulo','artefacto']
         if etiqueta not in posibles:
             raise ValueError(f'La etiqueta debe ser una de las siguientes: {posibles}')
@@ -527,9 +579,49 @@ class DataSetEEG (Dataset):
         # Asegurarse de que las etiquetas sean 0-indexadas si es necesario para CrossEntropyLoss
         if self.y.min() == 1:
             self.y = self.y - 1
+        self.etiqueta = etiqueta
+
+
+    def binarizar_estimulo (self):
+        '''
+        Convierte la etiqueta de estimulo en binaria:
+            vocal (0) y comando (1).
+        '''
+        if self.y_completa is None:
+            raise ValueError('No hay etiquetas originales para binarizar.')
+        est = self.y_completa[:, 1].astype(int)
+        self.y = np.where(est <= 5, 0, 1).astype(int)
+        self.etiqueta = 'estimulo_binario'
+
+
+    def split_estimulo_datasets (self):
+        '''
+        Convierte primero la etiqueta de estímulo del dataset original a binaria,
+        luego filtra por clase y devuelve dos DataSetEEG:
+          - vocales (5 clases, etiquetas 0..4)
+          - comandos (6 clases, etiquetas 0..5)
+        '''
+        self.binarizar_estimulo()
+
+        est = self.y_completa[:, 1].astype(int)
+        mascara_vocales = est <= 5
+        mascara_comandos = est > 5
+        x_vocales = self.x[mascara_vocales]
+        y_vocales = est[mascara_vocales] - 1
+        x_comandos = self.x[mascara_comandos]
+        y_comandos = est[mascara_comandos] - 6
+
+        dataset_vocales = DataSetEEG.desde_arrays(x_vocales, y_vocales, 'estimulo_vocal')
+        dataset_comandos = DataSetEEG.desde_arrays(x_comandos, y_comandos, 'estimulo_comando')
+        
+        return dataset_vocales, dataset_comandos
 
     
     def normalizar (self):
+        '''
+        Aplica normalizacion min-max a todos los datos, segun
+        los datos de entrenamiento.
+        '''
         self.maximo = np.max(self.x[self.indices_entrenamiento])
         self.minimo = np.min(self.x[self.indices_entrenamiento])
         self.x = (self.x - self.minimo) / (self.maximo - self.minimo)

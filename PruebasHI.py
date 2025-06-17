@@ -579,7 +579,7 @@ modelo_mlp = mbp.MLP(
     arq=arquitectura_mlp,
     func_act='relu', # o ['relu', 'relu', 'identity'] si la última capa no lleva activación antes de CrossEntropy
     usar_batch_norm=True,
-    dropout=0.2,
+    dropout=0.25,
     metodo_init_pesos=nn.init.xavier_uniform_,
     semilla=semilla
 )
@@ -589,7 +589,7 @@ print("Modelo MLP creado:")
 # 3. Instanciar Entrenador
 print("\nInstanciando Entrenador...")
 # El optimizador se puede definir aquí o dejar que Entrenador lo cree por defecto
-optimizador_adam = optim.Adam(modelo_mlp.parameters(), lr=0.001)
+optimizador_adam = optim.Adam(modelo_mlp.parameters(), lr=1e-4)
 funcion_perdida = nn.CrossEntropyLoss() # Adecuada para clasificación multiclase con salida de logits
 
 entrenador = mbp.Entrenador(
@@ -604,7 +604,7 @@ print("Entrenador listo.")
 
 # 4. Entrenar el modelo
 print("\nIniciando entrenamiento...")
-num_epocas = 100
+num_epocas = 1000
 entrenador.ajustar(
     cargador_entrenamiento=cargador_entrenamiento,
     cargador_validacion=cargador_validacion,
@@ -844,7 +844,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch import nn, optim
 
-sujeto = 12
+sujeto = 1
 prediccion = 'estimulo'
 datos = mbp.DataSetEEG(sujeto)
 datos.graficar_canales(np.random.randint(0, len(datos)))
@@ -855,16 +855,20 @@ datos.dejar_etiqueta(prediccion)
 # pruebo una clasificacion usando mbp.MLP
 arq = [entrenamiento[0][0].shape[0], 256, 256, 11]
 func_act = 'relu'
-modelo = mbp.MLP(arq, func_act = func_act)
+modelo = mbp.MLP(arq,
+                 func_act = func_act,
+                 usar_batch_norm = True,
+                 dropout = 0.01,
+                 metodo_init_pesos = nn.init.xavier_uniform_)
 entrenador = mbp.Entrenador(
                             modelo = modelo,
-                            optimizador = optim.Adam(modelo.parameters(), lr = 0.00001, weight_decay = 0.0001),
+                            optimizador = optim.Adam(modelo.parameters(), lr = 1e-7, weight_decay = 1e-3),
                             func_perdida = nn.CrossEntropyLoss(),
                             device = 'cuda' if torch.cuda.is_available() else 'cpu',
                             parada_temprana = 100,
                             log_dir = 'runs/prueba_dataset_crudo_mlp'
                             )
-batch_size = 31
+batch_size = 11
 cargador_entrenamiento = DataLoader(entrenamiento, batch_size = batch_size, shuffle = True, drop_last = False)
 cargador_validacion = DataLoader(validacion, batch_size = batch_size, shuffle = False)
 
@@ -872,7 +876,9 @@ entrenador.ajustar(cargador_entrenamiento, cargador_validacion, epocas = 1000)
 
 # probemos el evaluador
 cargador_prueba = DataLoader(prueba, batch_size = 1, shuffle = False)
-evaluador = mbp.Evaluador(modelo = modelo, clases = prediccion)
+evaluador = mbp.Evaluador(modelo = modelo,
+                          clases = prediccion,
+                          device = 'cuda' if torch.cuda.is_available() else 'cpu')
 
 evaluador.matriz_confusion(cargador_prueba)
 #evaluador.reporte(cargador_prueba)
@@ -1118,3 +1124,4 @@ for i, desv in enumerate(ventanas):
 
 plt.tight_layout()
 plt.show()
+
