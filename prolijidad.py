@@ -59,3 +59,29 @@ evaluador = mbp.Evaluador(modelo = modelo,
                           device = 'cuda' if torch.cuda.is_available() else 'cpu')
 
 evaluador.matriz_confusion(cargador_prueba)
+
+####################################################################################################################################
+####################################################################################################################################
+# PRUEBO LA CONVERSION DE DATOS A STFT
+# es para ver que la funcion funcione bien
+####################################################################################################################################
+
+import buenas_practicas as mbp
+import numpy as np
+import matplotlib.pyplot as plt
+import torch
+from torch.utils.data import DataLoader
+from torch import nn, optim
+
+sujeto = 1
+prediccion = 'estimulo'
+datos = mbp.DataSetEEG(sujeto)
+datos.convertir_a_stft(f_max = 1024, t_ventana = 256, t_solapamiento = 128, fs = 1024, aplanado = False)
+# hasta aca converti los datos sin truncar nada, la frecuencia maxima es la ultima
+datos[0]
+
+datos.dejar_etiqueta(prediccion)
+datos_vocales, datos_comandos = datos.split_estimulo_datasets()
+
+entrenamiento, validacion, prueba = datos.particionar(0.7, True)
+datos.normalizar()

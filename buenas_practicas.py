@@ -20,6 +20,7 @@ import scipy.io as sio
 import mne
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
+from scipy.signal import stft
 
 
 ############################################################################################################
@@ -216,7 +217,7 @@ class Entrenador ():
             self.optimizador.step()
             perdida_total += perdida.item()*x.shape[0]
         perdida_promedio_epoca = perdida_total / len(cargador_entrenamiento.dataset)
-        self.escritor.add_scalar('Perdida/entrenamiento', perdida_promedio_epoca, epoca)
+        self.escritor.add_scalar('Perdida/entrenamiento', perdida_promedio_epoca, epoca) ############################################################
         return perdida_promedio_epoca
 
 
@@ -240,8 +241,8 @@ class Entrenador ():
                     correctas += (predicciones == y).sum().item()
             perdida_promedio_epoca = perdida_total / len(cargador_validacion.dataset)
             precision = correctas / len(cargador_validacion.dataset)
-            self.escritor.add_scalar('Perdida/validacion', perdida_promedio_epoca, epoca)
-            self.escritor.add_scalar('Precision/validacion', precision, epoca)
+            self.escritor.add_scalar('Perdida/validacion', perdida_promedio_epoca, epoca) ############################################################
+            self.escritor.add_scalar('Precision/validacion', precision, epoca)            ############################################################
         return perdida_promedio_epoca, precision
 
 
@@ -625,3 +626,61 @@ class DataSetEEG (Dataset):
         self.maximo = np.max(self.x[self.indices_entrenamiento])
         self.minimo = np.min(self.x[self.indices_entrenamiento])
         self.x = (self.x - self.minimo) / (self.maximo - self.minimo)
+
+
+    def convertir_a_stft (self,
+                          f_max,
+                          t_ventana = 256,
+                          t_solapamiento = 128,
+                          fs = 1024,
+                          aplanado = True):
+        '''
+        Reemplaza los datos originales por la STFT de los mismos.
+        Solicita 4 parametros:
+            f_max :
+                Frecuencia maxima del espectrograma a retener. Todo lo que este
+                por encima de esta, se perderá.
+            t_ventana :
+                Cantidad de muestras temporales de las ventanas de la STFT.
+            t_solapamiento :
+                Cantidad de muestras temporales de solapamiento entre ventanas.
+            fs :
+                Frecuencia de muestreo de los datos. Dejo la posibilidad de definirla
+                por si se llegara a querer downsamplear.
+        '''
+
+        n_canales = 6
+        puntos_por_canal = 4*fs
+
+        stft_data = []
+        for i in range(self.x.shape[0]): # Iterar sobre cada muestra
+            sample_stft = []
+            for j in range(n_canales): # Iterar sobre cada canal dentro de la muestra
+                channel_data = self.x[i, j * puntos_por_canal : (j + 1) * puntos_por_canal]
+                # Calcular STFT para el canal
+                f, t, Zxx = stft(channel_data, fs=fs, nperseg = t_ventana, noverlap = t_solapamiento)
+
+                # de Zxx me quedo solo con los valores absolutos de aquellos cuya frecuencia sea
+                # menor o igual a f_max
+                mascara_frecuencia = f <= f_max
+                Zxx_filtrado = np.abs(Zxx[mascara_frecuencia, :])
+
+                if aplanado:
+                    # Aplanar el espectrograma filtrado y agregarlo a la lista de la muestra
+                    sample_stft.append(Zxx_filtrado.flatten())
+                else:
+                    # Mantener la estructura 2D (frecuencia x tiempo)
+                    sample_stft.append(Zxx_filtrado)
+
+            if aplanado:
+                # Concatenar los espectrogramas aplanados de todos los canales para la muestra
+                stft_data.append(np.concatenate(sample_stft))
+            else:
+                # Apilar los espectrogramas 2D de todos los canales (nuevo eje para canales)
+                # El resultado será (canales, frecuencias, tiempo)
+                stft_data.append(np.stack(sample_stft, axis=0))
+
+        ## Convertir la lista de arrays numpy a un único array numpy
+        stft_data_np = np.array(stft_data)
+        # Convierto el array numpy a tensor y lo guardo como self.x
+        self.x = torch.tensor(stft_data_np, dtype=torch.float32)
