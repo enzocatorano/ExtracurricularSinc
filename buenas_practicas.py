@@ -217,7 +217,7 @@ class Entrenador ():
             self.optimizador.step()
             perdida_total += perdida.item()*x.shape[0]
         perdida_promedio_epoca = perdida_total / len(cargador_entrenamiento.dataset)
-        self.escritor.add_scalar('Perdida/entrenamiento', perdida_promedio_epoca, epoca) ############################################################
+        self.escritor.add_scalar('Perdida/entrenamiento', perdida_promedio_epoca, epoca)
         return perdida_promedio_epoca
 
 
@@ -241,8 +241,8 @@ class Entrenador ():
                     correctas += (predicciones == y).sum().item()
             perdida_promedio_epoca = perdida_total / len(cargador_validacion.dataset)
             precision = correctas / len(cargador_validacion.dataset)
-            self.escritor.add_scalar('Perdida/validacion', perdida_promedio_epoca, epoca) ############################################################
-            self.escritor.add_scalar('Precision/validacion', precision, epoca)            ############################################################
+            self.escritor.add_scalar('Perdida/validacion', perdida_promedio_epoca, epoca)
+            self.escritor.add_scalar('Precision/validacion', precision, epoca)
         return perdida_promedio_epoca, precision
 
 
@@ -322,7 +322,7 @@ class Evaluador ():
     Clase para evaluar modelos PyTorch de forma genérica.
     Requiere que se haya usado la funcion dejar_etiqueta().
     '''
-    def __init__ (self, modelo : nn.Module, device : torch.device = None):
+    def __init__ (self, modelo : nn.Module, device : torch.device = None, clases: str = None):
 
         if device is None and device == 'cuda':
             if torch.cuda.is_available():
@@ -336,35 +336,40 @@ class Evaluador ():
             print('Se utilizara CPU.')
 
         self.modelo = modelo.to(self.device)
-
-
-    def revisar_etiqueta (self, cargador):
-        # reviso la existencia de cargador.dataset.etiqueta
-        if not hasattr(cargador.dataset.dataset, 'etiqueta'):
-            raise AttributeError('El dataset no tiene el atributo "etiqueta". Asegurese de haber usado la funcion dejar_etiqueta() en el DataSetEEG.')
-            
-        clases = cargador.dataset.dataset.etiqueta
-        if clases not in ['modalidad',
-                          'estimulo',
-                          'artefacto',
-                          'estimulo_binario',
-                          'estimulo_vocal'
-                          'estimulo_comando']:
-            raise ValueError('clases debe ser una de las siguientes: "modalidad", "estimulo", "artefacto", "estimulo_binario", "estimulo_vocal", "estimulo_comando".')
-        
         self.clases = clases
-        if clases == 'modalidad':
+        self.nombres_clases = None
+        if self.clases:
+            self._set_nombres_clases()
+
+
+    def _set_nombres_clases(self):
+        """Define los nombres de las clases para los gráficos basado en self.clases."""
+        if self.clases == 'modalidad':
             self.nombres_clases = ['Imaginada', 'Pronunciada']
-        elif clases == 'estimulo':
+        elif self.clases == 'estimulo':
             self.nombres_clases = ['A', 'E', 'I', 'O', 'U', 'Arriba', 'Abajo', 'Izquierda', 'Derecha', 'Adelante', 'Atras']
-        elif clases == 'artefacto':
+        elif self.clases == 'artefacto':
             self.nombres_clases = ['Limpio', 'Parpadeo']
-        elif clases == 'estimulo_binario':
+        elif self.clases == 'estimulo_binario':
             self.nombres_clases = ['Vocal', 'Comando']
-        elif clases == 'estimulo_vocal':
+        elif self.clases == 'estimulo_vocal':
             self.nombres_clases = ['A', 'E', 'I', 'O', 'U']
-        elif clases == 'estimulo_comando':
+        elif self.clases == 'estimulo_comando':
             self.nombres_clases = ['Arriba', 'Abajo', 'Izquierda', 'Derecha', 'Adelante', 'Atras']
+
+
+    def _inferir_clases(self, cargador):
+        """Intenta inferir las clases del dataset si no se proveyeron."""
+        if self.clases: # Si ya se proveyeron, no hacer nada.
+            return
+
+        dataset_obj = cargador.dataset
+        while isinstance(dataset_obj, Subset):
+            dataset_obj = dataset_obj.dataset
+
+        if hasattr(dataset_obj, 'etiqueta'):
+            self.clases = dataset_obj.etiqueta
+            self._set_nombres_clases()
 
 
     def probar (self, dataloader):
@@ -372,7 +377,8 @@ class Evaluador ():
         todas_preds = []
         todas_verdaderas = []
 
-        self.revisar_etiqueta(dataloader)
+        # Intenta inferir las clases si no se pasaron en el constructor
+        self._inferir_clases(dataloader)
 
         with torch.no_grad():
             for x, y in dataloader:
@@ -400,9 +406,9 @@ class Evaluador ():
         if plot:
             plt.style.use('dark_background')
             plt.figure(figsize=(8, 6))
-            sns.heatmap(cm, annot = True, fmt = "d", cmap = "cividis",
-                        xticklabels = self.nombres_clases if self.clases else np.unique(verdaderas),
-                        yticklabels = self.nombres_clases if self.clases else np.unique(verdaderas))
+            sns.heatmap(cm, annot=True, fmt="d", cmap="cividis",
+                        xticklabels=self.nombres_clases if self.nombres_clases else np.unique(verdaderas),
+                        yticklabels=self.nombres_clases if self.nombres_clases else np.unique(verdaderas))
             plt.xlabel("Etiqueta predicha")
             plt.ylabel("Etiqueta verdadera")
             plt.title(titulo)
@@ -478,7 +484,10 @@ class DataSetEEG (Dataset):
 
         # Convertir a tensores de PyTorch
         # Es buena práctica asegurar el tipo de dato, ej: float para datos, long para etiquetas
-        x_tensor = torch.from_numpy(current_x).float()
+        if isinstance(current_x, np.ndarray):
+            x_tensor = torch.from_numpy(current_x).float()
+        else: # Asumimos que ya es un torch.Tensor
+            x_tensor = current_x.float()
 
         # Manejar y: si es un escalar (como numpy.int64), convertirlo primero a un array NumPy 0-D
         if not isinstance(current_y_val, np.ndarray):
@@ -684,3 +693,6 @@ class DataSetEEG (Dataset):
         stft_data_np = np.array(stft_data)
         # Convierto el array numpy a tensor y lo guardo como self.x
         self.x = torch.tensor(stft_data_np, dtype=torch.float32)
+        self.tiempo_stft = t
+        mascara_frecuencia = f <= f_max
+        self.frecuencia_stft = f[mascara_frecuencia]
