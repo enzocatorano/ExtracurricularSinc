@@ -249,10 +249,14 @@ class Entrenador ():
     def ajustar (self,
                  cargador_entrenamiento: DataLoader,
                  cargador_validacion: DataLoader = None,
-                 epocas: int = 100):
+                 epocas: int = 100,
+                 nombre_modelo_salida: str = None):
         '''
         Ajusta el modelo.
         Verifica compatibilidad entre la salida del modelo, las etiquetas y la funcion perdida.
+
+        nombre_modelo_salida:
+            Si se proporciona, guarda el mejor modelo en esta ruta.
         '''
         x, y = next(iter(cargador_entrenamiento))
         self._revisar_formato_etiquetas(self.modelo(x.to(self.device)), y)
@@ -272,6 +276,8 @@ class Entrenador ():
                     mejor_perdida_validacion = perdida_validacion
                     epocas_sin_mejora = 0
                     mejor_modelo = copy.deepcopy(self.modelo.state_dict())
+                    if nombre_modelo_salida:
+                        torch.save(self.modelo.state_dict(), nombre_modelo_salida)
                 else:
                     epocas_sin_mejora += 1
                 if self.parada_temprana is not None and epocas_sin_mejora >= self.parada_temprana:

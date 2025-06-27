@@ -44,14 +44,14 @@ def main():
     cargador_prueba = DataLoader(prueba, batch_size = 1, shuffle = False)
 
     # Hyperparámetros
-    arq_encoder = [entrenamiento[0][0].shape[0], 4096]
-    z_dim = 1024
-    arq_decoder = [4096, entrenamiento[0][0].shape[0]]
+    arq_encoder = [entrenamiento[0][0].shape[0]]
+    z_dim = 4096
+    arq_decoder = [entrenamiento[0][0].shape[0]]
     func_act = 'relu'
     func_act_ultima_capa = False
     usar_batch_norm = True
     dropout = 0.05
-    lr = 1e-4
+    lr = 5e-4
     metodo_init_pesos = tr.nn.init.xavier_normal_
     DEVICE = 'cuda' if tr.cuda.is_available() else 'cpu'
     print(f'Usando dispositivo: {DEVICE}')
@@ -69,11 +69,11 @@ def main():
              lr = lr,
              metodo_init_pesos = metodo_init_pesos)
         
-    net.entrenar(cargador_entrenamiento, cargador_validacion, n_epochs = 3000, name_model = 'ae_sujeto1_deep')
+    net.entrenar(cargador_entrenamiento, cargador_validacion, n_epochs = 500, name_model = 'ae_sujeto1_4096')
     
     # print(f'Input: {dato_azar_on_device.shape}, Output: {xhat_on_device.shape}')
     print('#####################################################################')
-    # en todo el dataset de prueba y validacion (juntos)
+    # en todo el dataset de prueba
     # calculo la similaridad cosen y SNR promedio
     net.eval()
     net.to(DEVICE)

@@ -132,7 +132,7 @@ def cargar_AE_entrenado ():
     
     # cargo el modelo
     # Hyperparámetros (deben coincidir con los usados en el entrenamiento)
-    sujeto = 1
+    sujeto = 2
     prediccion = 'estimulo'
     datos = mbp.DataSetEEG(sujeto)
     datos.dejar_etiqueta(prediccion)
@@ -143,7 +143,7 @@ def cargar_AE_entrenado ():
     cargador_prueba = DataLoader(prueba, batch_size=1, shuffle=False)
 
     arq_encoder = [entrenamiento[0][0].shape[0]]
-    z_dim = 1024
+    z_dim = 4096
     arq_decoder = [entrenamiento[0][0].shape[0]]
     func_act = 'relu'
     func_act_ultima_capa = False
@@ -168,16 +168,16 @@ def cargar_AE_entrenado ():
 
     # Cargar los pesos guardados
     try:
-        modelo_cargado.load_state_dict(tr.load('ae_sujeto1_dr_bn_5e-4', map_location=DEVICE))
+        modelo_cargado.load_state_dict(tr.load('ae_sujeto1_4096', map_location=DEVICE))
         print("Modelo cargado exitosamente.")
     except FileNotFoundError:
-        print(f"Error: El archivo del modelo 'ae_sujeto1_dr_bn_5e-4' no se encontró.")
+        print(f"Error: El archivo del modelo 'ae_sujeto1_4096' no se encontró.")
         return
     
     modelo_cargado.eval() # Poner el modelo en modo evaluación
 
     print('#####################################################################')
-    # en todo el dataset de prueba y validacion (juntos)
+    # en todo el dataset de prueba
     # calculo la similaridad cosen y SNR promedio
     modelo_cargado.to(DEVICE)
     similarity = []
@@ -207,12 +207,11 @@ def cargar_AE_entrenado ():
 
     # grafico la señal original y reconstruida en la parte superior de una figura de 2 graficos
     # en el inferior muestro la fft de la original y reconstruida tambien
-    tiempo = np.arange(0, dato_azar_on_device.shape[1]) / 1024
     plt.style.use('dark_background')
     plt.figure(figsize = (18, 6))
     plt.subplot(2, 1, 1)
-    plt.plot(tiempo, dato_azar_on_device.squeeze().cpu().detach().numpy(), color='dodgerblue', label='Original')
-    plt.plot(tiempo, xhat_on_device.squeeze().cpu().detach().numpy(), color='orange', label='Reconstruida')
+    plt.plot(dato_azar_on_device.squeeze().cpu().detach().numpy(), color='dodgerblue', label='Original')
+    plt.plot(xhat_on_device.squeeze().cpu().detach().numpy(), color='orange', label='Reconstruida')
     plt.title('Señal Original vs. Reconstruida')
     plt.xlabel('Muestras')
     plt.ylabel('Amplitud')
@@ -220,17 +219,19 @@ def cargar_AE_entrenado ():
     plt.legend()
 
     plt.subplot(2, 1, 2)
-    # Calcular FFT
-    fft_original = tr.fft.fft(dato_azar_on_device.squeeze().cpu().detach())
-    fft_reconstruida = tr.fft.fft(xhat_on_device.squeeze().cpu().detach())
+    # Calcular FFT al primer canal solamente, los primeros 4096 datos
+    dato_azar_cpu_canal1 = dato_azar_cpu[:4096]
+    xhat_on_device_canal1 = xhat_on_device[:4096]
+    fft_original = tr.fft.fft(dato_azar_cpu_canal1).squeeze().cpu().detach()
+    fft_reconstruida = tr.fft.fft(xhat_on_device_canal1).squeeze().cpu().detach()
 
     # Obtener magnitudes y frecuencias
     magnitudes_original = tr.abs(fft_original)
     magnitudes_reconstruida = tr.abs(fft_reconstruida)
     
     # Solo la mitad positiva del espectro
-    n = len(dato_azar_on_device.squeeze())
-    frecuencias = tr.fft.fftfreq(n, 1/1024) # Asumiendo frecuencia de muestreo de 1
+    n = len(dato_azar_cpu_canal1)
+    frecuencias = tr.fft.fftfreq(n, 1/1024)
 
     # quiero graficar solo hasta 64Hz
     frecuencias = frecuencias[:n//2]
@@ -241,10 +242,10 @@ def cargar_AE_entrenado ():
     
     plt.plot(frecuencias[:idx_64hz], magnitudes_original[:idx_64hz], color='dodgerblue', label='FFT Original')
     plt.plot(frecuencias[:idx_64hz], magnitudes_reconstruida[:idx_64hz], color='orange', label='FFT Reconstruida')
-    plt.title('Espectro de Frecuencia (FFT)')
+    plt.title('Espectro de Frecuencia (FFT) del Canal 1')
     plt.xlabel('Frecuencia (Hz)')
     plt.ylabel('Magnitud')
-    plt.grid(linewidth=0.2)
+    plt.grid(linewidth = 0.2)
     plt.legend()
     plt.tight_layout()
     plt.show()
@@ -350,7 +351,7 @@ def AE_MLP_clasificador ():
 
     # Hyperparámetros del AE (deben coincidir con los usados en el entrenamiento del AE)
     arq_encoder = [entrenamiento_ae[0][0].shape[0]]
-    z_dim = 1024
+    z_dim = 4096
     arq_decoder = [entrenamiento_ae[0][0].shape[0]]
     func_act_ae = 'relu'
     func_act_ultima_capa_ae = False
@@ -373,10 +374,10 @@ def AE_MLP_clasificador ():
                  metodo_init_pesos = metodo_init_pesos_ae)
     # Cargar los pesos guardados del AE
     try:
-        modelo_ae.load_state_dict(tr.load('ae_sujeto1_dr_bn_5e-4', map_location=DEVICE))
+        modelo_ae.load_state_dict(tr.load('ae_sujeto1_4096', map_location=DEVICE))
         print("Modelo AE cargado exitosamente.")
     except:
-        print(f"Error: El archivo del modelo 'ae_sujeto1_dr+bn' no se encontró.")
+        print(f"Error: El archivo del modelo 'ae_sujeto1_4096' no se encontró.")
         return
     modelo_ae.eval() # Poner el modelo en modo evaluación
     # Congelar los pesos del encoder del AE
@@ -384,22 +385,22 @@ def AE_MLP_clasificador ():
         param.requires_grad = False
 
     # creo el mlp
-    modelo_mlp = mbp.MLP(arq = [z_dim, 128, 64, 11],
+    modelo_mlp = mbp.MLP(arq = [z_dim, 1024, 256, 11],
                          func_act = 'relu',
                          usar_batch_norm = False,
                          dropout = 0.05,
                          metodo_init_pesos = tr.nn.init.xavier_uniform_)
-    
+
     # defino al entrenador
     entrenador = mbp.Entrenador(
                                 modelo = modelo_mlp,
-                                optimizador = optim.Adam(modelo_mlp.parameters(), lr = 1e-5, weight_decay = 1e-7),
+                                optimizador = optim.Adam(modelo_mlp.parameters(), lr = 5e-6, weight_decay = 1e-7),
                                 func_perdida = nn.CrossEntropyLoss(),
                                 device = 'cuda' if tr.cuda.is_available() else 'cpu',
-                                parada_temprana = 50,
-                                log_dir = 'runs/AE_MLP_clasificador'
+                                parada_temprana = 100,
+                                log_dir = 'runs/AE_MLP_clasificador_4096'
                                 )
-    
+
     def crear_dataset_latente(modelo_ae, subset_original, device, batch_size=32):
         """
         Pasa un dataset a través del encoder de un AE y devuelve un TensorDataset
@@ -456,13 +457,415 @@ def AE_MLP_clasificador ():
     entrenador.ajustar(
         cargador_entrenamiento = cargador_entrenamiento_mlp,
         cargador_validacion = cargador_validacion_mlp,
-        epocas = 1000
+        epocas = 1000,
+        nombre_modelo_salida = 'MLP_4096_sujeto1'
     )
     # Evaluar el MLP
     print("\nEvaluando el clasificador MLP...")
     evaluador = mbp.Evaluador(modelo = modelo_mlp, device = DEVICE, clases='estimulo')
     evaluador.matriz_confusion(cargador_prueba_mlp)
 
+####################################################################################################################################
+####################################################################################################################################
+# AE EN OTRO SUJETO
+# cargamos el AE entrenado sobre el sujeto 1, para probarlo en los datos del sujero 2
+####################################################################################################################################
+def AE_otro_sujeto (nombre_archivo_modelo, graficar):
+    import buenas_practicas as mbp
+    import ClaseAE as cae
+    import torch as tr
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from torch.utils.data import DataLoader
+    from sklearn.manifold import TSNE
+
+    # cargo el modelo
+    # Hyperparámetros (deben coincidir con los usados en el entrenamiento)
+
+    arq_encoder = [1024*4*6]
+    z_dim = 4096
+    arq_decoder = [1024*4*6]
+    func_act = 'relu'
+    func_act_ultima_capa = False
+    usar_batch_norm = True
+    dropout = 0.05
+    lr = 5e-4
+    metodo_init_pesos = tr.nn.init.xavier_normal_
+    DEVICE = 'cuda' if tr.cuda.is_available() else 'cpu'
+
+    # Instanciar el modelo con la misma arquitectura
+    modelo_cargado = cae.AE(arq_encoder=arq_encoder,
+                 z_dim=z_dim,
+                 arq_decoder=arq_decoder,
+                 func_act=func_act,
+                 func_act_ultima_capa=func_act_ultima_capa,
+                 usar_batch_norm=usar_batch_norm,
+                 dropout=dropout,
+                 device=DEVICE,
+                 log_dir='runs/ae_remastered', # No es estrictamente necesario para cargar, pero es bueno mantenerlo
+                 lr = lr,
+                 metodo_init_pesos = metodo_init_pesos)
+    # Cargar los pesos guardados
+    try:
+        modelo_cargado.load_state_dict(tr.load(nombre_archivo_modelo, map_location=DEVICE))
+        print("Modelo cargado exitosamente.")
+    except FileNotFoundError:
+        print(f"Error: El archivo del modelo {nombre_archivo_modelo} no se encontró.")
+        return
+    modelo_cargado.eval() # Poner el modelo en modo evaluación
+
+    similaridad_por_sujeto = []
+    snr_por_sujeto = []
+    for sujeto in range(1, 3):
+        prediccion = 'estimulo'
+        datos = mbp.DataSetEEG(sujeto)
+        datos.dejar_etiqueta(prediccion)
+        entrenamiento, validacion, prueba = datos.particionar(0.7, True, semilla = 123)
+
+        # cargador_entrenamiento = DataLoader(entrenamiento, batch_size=1, shuffle=False)
+        # cargador_validacion = DataLoader(validacion, batch_size=1, shuffle=False)
+        # cargador_prueba = DataLoader(prueba, batch_size=1, shuffle=False)
+        print('#####################################################################')
+        # en todo el dataset de prueba y validacion (juntos)
+        # calculo la similaridad cosen y SNR promedio
+        modelo_cargado.to(DEVICE)
+        similarity = []
+        snr = []
+        for x, _ in prueba:
+            with tr.no_grad():
+                # añado una dimensión de batch al dato de entrada antes de pasarlo al modelo
+                x_batched = x.unsqueeze(0).to(DEVICE)
+                xhat = modelo_cargado(x_batched)
+                similarity.append(tr.cosine_similarity(x_batched, xhat, dim=1))
+                snr.append(10 * tr.log10(tr.sum(x_batched ** 2) / tr.sum((x_batched - xhat) ** 2)))
+        similarity = tr.cat(similarity)
+        snr = tr.stack(snr)
+        print(f'En los datos de prueba del sujeto {sujeto}')
+        print(f'Similaridad coseno promedio: {similarity.mean().item()}')
+        print(f'SNR promedio: {snr.mean().item()}')
+        print('#####################################################################')
+        similaridad_por_sujeto.append(similarity.mean().item())
+        snr_por_sujeto.append(snr.mean().item())
+
+        if graficar:
+            print('Pruebo dato al azar')
+            modelo_cargado.to(DEVICE)
+            dato_azar_cpu = datos[np.random.randint(0, len(datos))][0] # Shape: [x_size]
+            # Add a batch dimension and move to the correct device
+            dato_azar_batched_cpu = dato_azar_cpu.unsqueeze(0) # Shape: [1, x_size]
+            dato_azar_on_device = dato_azar_batched_cpu.to(DEVICE)
+
+            z = modelo_cargado.encode(dato_azar_on_device)
+            xhat_on_device = modelo_cargado.decode(z)
+
+            # grafico la señal original y reconstruida en la parte superior de una figura de 2 graficos
+            # en el inferior muestro la fft de la original y reconstruida tambien
+            tiempo = np.arange(0, dato_azar_on_device.shape[1]) / 1024
+            plt.style.use('dark_background')
+            plt.figure(figsize = (18, 6))
+            plt.subplot(2, 1, 1)
+            plt.plot(tiempo, dato_azar_on_device.squeeze().cpu().detach().numpy(), color='dodgerblue', label='Original')
+            plt.plot(tiempo, xhat_on_device.squeeze().cpu().detach().numpy(), color='orange', label='Reconstruida')
+            plt.title('Señal Original vs. Reconstruida')
+            plt.xlabel('Muestras')
+            plt.ylabel('Amplitud')
+            plt.grid(linewidth=0.2)
+            plt.legend()
+
+            plt.subplot(2, 1, 2)
+            # Calcular FFT
+            fft_original = tr.fft.fft(dato_azar_on_device.squeeze().cpu().detach())
+            fft_reconstruida = tr.fft.fft(xhat_on_device.squeeze().cpu().detach())
+
+            # Obtener magnitudes y frecuencias
+            magnitudes_original = tr.abs(fft_original)
+            magnitudes_reconstruida = tr.abs(fft_reconstruida)
+            
+            # Solo la mitad positiva del espectro
+            n = len(dato_azar_on_device.squeeze())
+            frecuencias = tr.fft.fftfreq(n, 1/1024) # Asumiendo frecuencia de muestreo de 1
+
+            # quiero graficar solo hasta 64Hz
+            frecuencias = frecuencias[:n//2]
+            magnitudes_original = magnitudes_original[:n//2]
+            magnitudes_reconstruida = magnitudes_reconstruida[:n//2]
+            # Filtrar hasta 64 Hz
+            idx_64hz = (tr.abs(frecuencias - 64)).argmin() + 1 # Encuentra el índice más cercano a 64 Hz
+            
+            plt.plot(frecuencias[:idx_64hz], magnitudes_original[:idx_64hz], color='dodgerblue', label='FFT Original')
+            plt.plot(frecuencias[:idx_64hz], magnitudes_reconstruida[:idx_64hz], color='orange', label='FFT Reconstruida')
+            plt.title('Espectro de Frecuencia (FFT)')
+            plt.xlabel('Frecuencia (Hz)')
+            plt.ylabel('Magnitud')
+            plt.grid(linewidth=0.2)
+            plt.legend()
+            plt.tight_layout()
+            plt.show()
+
+    print(similaridad_por_sujeto)
+    print(snr_por_sujeto)
+
+####################################################################################################################################
+####################################################################################################################################
+# PRUEBA MLP ENTRENADO
+# cargo el MLP entrenado con las latentes del AE para hacerle pruebas
+####################################################################################################################################
+def probar_MLP_entrenado ():
+    import buenas_practicas as mbp
+    import ClaseAE as cae
+    import torch as tr
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from torch.utils.data import DataLoader
+    from sklearn.manifold import TSNE
+    
+    # cargo el AE
+    # Hyperparámetros (deben coincidir con los usados en el entrenamiento)
+    arq_encoder = [1024*4*6]
+    z_dim = 4096
+    arq_decoder = [1024*4*6]
+    func_act = 'relu'
+    func_act_ultima_capa = False
+    usar_batch_norm = True
+    dropout = 0.05
+    lr = 5e-4
+    metodo_init_pesos = tr.nn.init.xavier_normal_
+    DEVICE = 'cuda' if tr.cuda.is_available() else 'cpu'
+
+    # Instanciar el modelo con la misma arquitectura
+    modelo_cargado = cae.AE(arq_encoder=arq_encoder,
+                 z_dim=z_dim,
+                 arq_decoder=arq_decoder,
+                 func_act=func_act,
+                 func_act_ultima_capa=func_act_ultima_capa,
+                 usar_batch_norm=usar_batch_norm,
+                 dropout=dropout,
+                 device=DEVICE,
+                 log_dir='runs/ae_remastered', # No es estrictamente necesario para cargar, pero es bueno mantenerlo
+                 lr = lr,
+                 metodo_init_pesos = metodo_init_pesos)
+    # Cargar los pesos guardados
+    try:
+        modelo_cargado.load_state_dict(tr.load('ae_sujeto1_4096', map_location=DEVICE))
+        print("Modelo cargado exitosamente.")
+    except FileNotFoundError:
+        print(f"Error: El archivo del modelo ae_sujeto1_4096 no se encontró.")
+        return
+    modelo_cargado.eval() # Poner el modelo en modo evaluación
+
+    # cargo el MLP
+    modelo_mlp = mbp.MLP(arq = [z_dim, 1024, 256, 11],
+                         func_act = 'relu',
+                         usar_batch_norm = False,
+                         dropout = 0.05,
+                         metodo_init_pesos = tr.nn.init.xavier_uniform_)
+    try:
+        modelo_mlp.load_state_dict(tr.load('MLP_4096_sujeto1', map_location=DEVICE, weights_only=True))
+        print("Modelo MLP cargado exitosamente.")
+    except FileNotFoundError:
+        print(f"Error: El archivo del modelo 'MLP_4096_sujeto1' no se encontró.")
+        return
+    modelo_mlp.eval() # Poner el modelo en modo evaluación
+
+    def crear_dataset_latente(modelo_ae, subset_original, device, batch_size=32):
+        """
+        Pasa un dataset a través del encoder de un AE y devuelve un TensorDataset
+        con las representaciones latentes y las etiquetas originales.
+        Este enfoque procesa los datos en lotes, lo que es mucho más eficiente.
+        """
+        modelo_ae.eval()
+        # Usamos un DataLoader para procesar en lotes, es mucho más rápido
+        cargador = DataLoader(subset_original, batch_size=batch_size, shuffle=False)
+        
+        todas_latentes = []
+        todas_etiquetas = []
+        
+        with tr.no_grad():
+            for x_batch, y_batch in cargador:
+                x_batch = x_batch.to(device)
+                z_batch = modelo_ae.encode(x_batch)
+                todas_latentes.append(z_batch.cpu())
+                todas_etiquetas.append(y_batch)
+                
+        tensor_latentes = tr.cat(todas_latentes, dim=0)
+        tensor_etiquetas = tr.cat(todas_etiquetas, dim=0)
+        
+        return tr.utils.data.TensorDataset(tensor_latentes, tensor_etiquetas)
+
+    # quiero probar el MLP sobre los datos de prueba
+    sujeto = 1
+    prediccion = 'estimulo'
+    datos = mbp.DataSetEEG(sujeto)
+    datos.dejar_etiqueta(prediccion)
+    entrenamiento_ae, validacion_ae, prueba_ae = datos.particionar(0.7, True, semilla = 456)
+
+    # Hago pasar todo el dataset por el AE para crear los datos para alimentar al MLP
+    print("Creando datasets con representaciones latentes para el MLP...")
+    batch_size_ae_proc = 32 # batch size para la codificación
+    prueba_mlp = crear_dataset_latente(modelo_cargado, prueba_ae, DEVICE, batch_size_ae_proc)
+
+    # tengo que generar los de entrenamiento tambien, para poder normalizar
+    entrenamiento_mlp = crear_dataset_latente(modelo_cargado, entrenamiento_ae, DEVICE, batch_size_ae_proc)
+    # normalizo
+    all_train_latents = entrenamiento_mlp.tensors[0]
+    min_val = all_train_latents.min()
+    max_val = all_train_latents.max()
+    # Función de normalización
+    def normalizar_tensor_dataset(dataset, min_val, max_val):
+        normalized_latents = (dataset.tensors[0] - min_val) / (max_val - min_val)
+        return tr.utils.data.TensorDataset(normalized_latents, dataset.tensors[1])
+    prueba_mlp = normalizar_tensor_dataset(prueba_mlp, min_val, max_val)
+    print("Datasets latentes creados.")
+
+    cargador_prueba_mlp = DataLoader(prueba_mlp, batch_size = 1, shuffle = False)
+
+    # Evaluar el MLP
+    print("\nEvaluando el clasificador MLP...")
+    evaluador = mbp.Evaluador(modelo = modelo_mlp, device = DEVICE, clases = 'estimulo')
+    evaluador.matriz_confusion(cargador_prueba_mlp)
+
+####################################################################################################################################
+####################################################################################################################################
+# AJUSTE FINO
+# tomar el AE entrenado sobre el sujeto 1, y ajustarlo finamente sobre el sujeto 2
+####################################################################################################################################
+def ajuste_fino_sobre_otro_sujeto ():
+    import buenas_practicas as mbp
+    import ClaseAE as cae
+    import torch as tr
+    import numpy as np
+    import matplotlib.pyplot as plt
+    from torch.utils.data import DataLoader
+    from sklearn.manifold import TSNE
+
+    # cargo el AE
+    # Hyperparámetros (deben coincidir con los usados en el entrenamiento)
+    arq_encoder = [1024*4*6]
+    z_dim = 4096
+    arq_decoder = [1024*4*6]
+    func_act = 'relu'
+    func_act_ultima_capa = False
+    usar_batch_norm = True
+    dropout = 0.05
+    lr = 5e-4
+    metodo_init_pesos = tr.nn.init.xavier_normal_
+    DEVICE = 'cuda' if tr.cuda.is_available() else 'cpu'
+
+    # Instanciar el modelo con la misma arquitectura
+    modelo_cargado = cae.AE(arq_encoder=arq_encoder,
+                 z_dim=z_dim,
+                 arq_decoder=arq_decoder,
+                 func_act=func_act,
+                 func_act_ultima_capa=func_act_ultima_capa,
+                 usar_batch_norm=usar_batch_norm,
+                 dropout=dropout,
+                 device=DEVICE,
+                 log_dir='runs/ae_remastered', # No es estrictamente necesario para cargar, pero es bueno mantenerlo
+                 lr = lr,
+                 metodo_init_pesos = metodo_init_pesos)
+    # Cargar los pesos guardados
+    try:
+        modelo_cargado.load_state_dict(tr.load('ae_sujeto1_4096', map_location=DEVICE))
+        print("Modelo cargado exitosamente.")
+    except FileNotFoundError:
+        print(f"Error: El archivo del modelo ae_sujeto1_4096 no se encontró.")
+        return
+    
+    # cargo los datos del sujeto 2
+    sujeto = 2
+    prediccion = 'estimulo'
+    datos = mbp.DataSetEEG(sujeto)
+    datos.dejar_etiqueta(prediccion)
+    entrenamiento_ae, validacion_ae, prueba_ae = datos.particionar(0.7, True, semilla = 123)
+
+    # armo los cargadores
+    batch_size = 32
+    cargador_entrenamiento = DataLoader(entrenamiento_ae, batch_size = batch_size, shuffle = True, drop_last = True)
+    cargador_validacion = DataLoader(validacion_ae, batch_size = batch_size, shuffle = False)
+    cargador_prueba = DataLoader(prueba_ae, batch_size = 1, shuffle = False)
+
+    # bajo el lr del modelo
+    modelo_cargado.lr = 5e-5
+    modelo_cargado.optim = tr.optim.Adam(modelo_cargado.parameters(), lr = modelo_cargado.lr)
+
+    # ajustar el modelo
+    modelo_cargado.train()
+    modelo_cargado.entrenar(cargador_entrenamiento, cargador_validacion, n_epochs = 50, name_model = 'ae_sujeto2_4096_ajuste_fino')
+
+    print('#####################################################################')
+    # en todo el dataset de prueba
+    # calculo la similaridad cosen y SNR promedio
+    modelo_cargado.eval()
+    modelo_cargado.to(DEVICE)
+    similarity = []
+    snr = []
+    for x, _ in cargador_prueba:
+        with tr.no_grad():
+            x = x.to(DEVICE)
+            xhat = modelo_cargado(x)
+            similarity.append(tr.cosine_similarity(x, xhat, dim=1))
+            snr.append(10 * tr.log10(tr.sum(x ** 2) / tr.sum((x - xhat) ** 2)))
+    similarity = tr.cat(similarity)
+    snr = tr.stack(snr)
+    print('En los datos de prueba')
+    print(f'Similaridad coseno promedio: {similarity.mean().item()}')
+    print(f'SNR promedio: {snr.mean().item()}')
+    print('#####################################################################')
+
+    print('Pruebo dato al azar')
+    modelo_cargado.to(DEVICE)
+    dato_azar_cpu = prueba_ae[np.random.randint(0, len(prueba_ae))][0] # Shape: [x_size]
+    # Add a batch dimension and move to the correct device
+    dato_azar_batched_cpu = dato_azar_cpu.unsqueeze(0) # Shape: [1, x_size]
+    dato_azar_on_device = dato_azar_batched_cpu.to(DEVICE)
+
+    z = modelo_cargado.encode(dato_azar_on_device)
+    xhat_on_device = modelo_cargado.decode(z)
+
+    # grafico la señal original y reconstruida en la parte superior de una figura de 2 graficos
+    # en el inferior muestro la fft de la original y reconstruida tambien
+    plt.style.use('dark_background')
+    plt.figure(figsize = (18, 6))
+    plt.subplot(2, 1, 1)
+    plt.plot(dato_azar_on_device.squeeze().cpu().detach().numpy(), color='dodgerblue', label='Original')
+    plt.plot(xhat_on_device.squeeze().cpu().detach().numpy(), color='orange', label='Reconstruida')
+    plt.title('Señal Original vs. Reconstruida')
+    plt.xlabel('Muestras')
+    plt.ylabel('Amplitud')
+    plt.grid(linewidth=0.2)
+    plt.legend()
+
+    plt.subplot(2, 1, 2)
+    # Calcular FFT al primer canal solamente, los primeros 4096 datos
+    dato_azar_cpu_canal1 = dato_azar_cpu[:4096]
+    xhat_on_device_canal1 = xhat_on_device[:4096]
+    fft_original = tr.fft.fft(dato_azar_cpu_canal1).squeeze().cpu().detach()
+    fft_reconstruida = tr.fft.fft(xhat_on_device_canal1).squeeze().cpu().detach()
+
+    # Obtener magnitudes y frecuencias
+    magnitudes_original = tr.abs(fft_original)
+    magnitudes_reconstruida = tr.abs(fft_reconstruida)
+    
+    # Solo la mitad positiva del espectro
+    n = len(dato_azar_cpu_canal1)
+    frecuencias = tr.fft.fftfreq(n, 1/1024) # Asumiendo frecuencia de muestreo de 1
+
+    # quiero graficar solo hasta 64Hz
+    frecuencias = frecuencias[:n//2]
+    magnitudes_original = magnitudes_original[:n//2]
+    magnitudes_reconstruida = magnitudes_reconstruida[:n//2]
+    # Filtrar hasta 64 Hz
+    idx_64hz = (tr.abs(frecuencias - 64)).argmin() + 1 # Encuentra el índice más cercano a 64 Hz
+    
+    plt.plot(frecuencias[:idx_64hz], magnitudes_original[:idx_64hz], color='dodgerblue', label='FFT Original')
+    plt.plot(frecuencias[:idx_64hz], magnitudes_reconstruida[:idx_64hz], color='orange', label='FFT Reconstruida')
+    plt.title('Espectro de Frecuencia (FFT) del Canal 1')
+    plt.xlabel('Frecuencia (Hz)')
+    plt.ylabel('Magnitud')
+    plt.grid(linewidth = 0.2)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
 
 ####################################################################################################################################
 ####################################################################################################################################
@@ -472,7 +875,9 @@ if __name__ == '__main__':
     #prueba_conversion_stft()
     #cargar_AE_entrenado()
     #prueba_prediccion_estimulo()
-    AE_MLP_clasificador()
-
+    #AE_MLP_clasificador()
+    AE_otro_sujeto('ae_sujeto2_4096_ajuste_fino', True)
+    #probar_MLP_entrenado()
+    #ajuste_fino_sobre_otro_sujeto()
 
 ####################################################################################################################################
