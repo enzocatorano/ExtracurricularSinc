@@ -20,7 +20,8 @@ import scipy.io as sio
 import mne
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
-from scipy.signal import stft
+from scipy.signal import stft, decimate
+import pywt
 
 
 ############################################################################################################
@@ -452,10 +453,11 @@ class DataSetEEG (Dataset):
     Carga los datos de EEG, y deja a punto para usar en los modelos Pytorch.
     Si sujeto es None, se usa un objeto vacío; útil para crear datasets desde arrays.
     '''
-    def __init__ (self, sujeto = None, ruta_sujetos = '../Base_de_Datos_Habla_Imaginada/'):
+    def __init__ (self, sujeto = None, ruta_sujetos = '../Base_de_Datos_Habla_Imaginada/', fs_original = 1024):
         '''
         Carga los datos de un sujeto.
         '''
+        self.fs = fs_original  # frecuencia de muestreo actual
         if sujeto is not None:
             self.sujeto = sujeto
             ruta = ruta_sujetos
@@ -702,3 +704,152 @@ class DataSetEEG (Dataset):
         self.tiempo_stft = t
         mascara_frecuencia = f <= f_max
         self.frecuencia_stft = f[mascara_frecuencia]
+
+
+    def downsamplear(self, factor, nueva_fs):
+        '''
+        Downsamplea self.x por un factor entero reescribiendo los datos y actualiza self.fs.
+        '''
+        n_ensayos, total = self.x.shape
+        n_canales = 6
+        largo_ant = total // n_canales
+        largo_nuevo = largo_ant // factor
+        datos_ds = np.zeros((n_ensayos, n_canales * largo_nuevo))
+        for i in range(n_ensayos):
+            vect = self.x[i]
+            for ch in range(n_canales):
+                canal = vect[ch*largo_ant:(ch+1)*largo_ant]
+                canal_ds = decimate(canal, factor, ftype='iir', zero_phase=True)
+                datos_ds[i, ch*largo_nuevo:(ch+1)*largo_nuevo] = canal_ds
+        self.x = datos_ds
+        self.fs = nueva_fs
+
+    def extraer_energias_wavelet(self, ondata=None, wavelet='db4', nivel=5, frecuencia_muestreo=None):
+        '''
+        Calcula las energías relativas (RWE) para cada ensayo y canal.
+        Retorna matriz (n_ensayos, 6*nivel) con RWE por bandas.
+        frecuencia_muestreo: sampling rate en Hz, por si hay downsampling previo.
+        '''
+        datos = self.x if ondata is None else ondata
+        n_ensayos = datos.shape[0]
+        energias = np.zeros((n_ensayos, 6 * nivel))
+        for i in range(n_ensayos):
+            vect = datos[i]
+            largo = vect.size // 6
+            feats = []
+            for ch in range(6):
+                canal = vect[ch*largo:(ch+1)*largo]
+                coeffs = pywt.wavedec(canal, wavelet, level=nivel)
+                coeffs_rev = coeffs[::-1]
+                E = np.array([np.sum(c**2) for c in coeffs_rev])
+                Et = E.sum()
+                rwe = E / Et
+                # descartamos la banda d1
+                rwe_sel = rwe[1:]
+                feats.extend(rwe_sel)
+            energias[i] = np.array(feats)
+        return energias
+
+    def graficar_reconstrucciones_bandas(self, ensayo, canal, wavelet='db4', nivel=5, frecuencia_muestreo=None):
+        '''
+        Grafica la señal original y las reconstrucciones por banda para un ensayo y canal.
+        frecuencia_muestreo: sampling rate en Hz, por si hay downsampling previo.
+        '''
+        fs = frecuencia_muestreo if frecuencia_muestreo is not None else self.fs
+        datos = self.x[ensayo]
+        largo = datos.size // 6
+        señal = datos[canal*largo:(canal+1)*largo]
+        coeffs = pywt.wavedec(señal, wavelet, level=nivel)
+        t = np.arange(len(señal)) / fs
+        n_plots = nivel + 1
+        fig, axes = plt.subplots(n_plots, 1, figsize=(16, 1.5*n_plots), sharex = True)
+        axes[0].plot(t, señal)
+        axes[0].set_title(f'Ensayo {ensayo}, Canal {canal}: señal original')
+        for j in range(1, nivel+1):
+            coeffs_band = [np.zeros_like(c) for c in coeffs]
+            coeffs_band[j] = coeffs[j]
+            rec = pywt.waverec(coeffs_band, wavelet)
+            axes[j].plot(t, rec[:len(t)])
+            nombre = 'a' if j == nivel else 'd'
+            nivel_idx = nivel - j + 1
+            axes[j].set_title(f'Banda {nombre}{nivel_idx}')
+        plt.xlabel('Tiempo (s)')
+        plt.tight_layout()
+        plt.show()
+
+    def graficar_espectrograma_wavelet(self, ensayo, wavelet='db4', nivel=5, frecuencia_muestreo=None):
+        '''
+        Grafica un "espectrograma" DWT con bloques de coeficientes para los 6 canales.
+        frecuencia_muestreo: sampling rate en Hz, por si hay downsampling previo.
+        '''
+        fs = frecuencia_muestreo if frecuencia_muestreo is not None else self.fs
+        datos = self.x[ensayo]
+        n_canales = 6
+        largo = datos.size // n_canales
+        fig, axes = plt.subplots(n_canales, 1, figsize=(8, 12))
+        for ch in range(n_canales):
+            señal = datos[ch*largo:(ch+1)*largo]
+            coeffs = pywt.wavedec(señal, wavelet, level=nivel)
+            bloques = coeffs[::-1]
+            max_len = max(len(b) for b in bloques)
+            mat = np.zeros((len(bloques), max_len))
+            for i, b in enumerate(bloques):
+                mat[i, :len(b)] = np.abs(b)
+            axes[ch].imshow(mat, aspect='auto', origin='lower')
+            axes[ch].set_title(f'Canal {ch} (Ensayo {ensayo})')
+            axes[ch].set_ylabel('Nivel')
+        axes[-1].set_xlabel('Coeficiente index')
+        plt.tight_layout()
+        plt.show()
+
+
+############################################################################################################
+############################################################################################################
+############################################################################################################
+
+
+class DataSetEEGCompleto (Dataset):
+    def __init__(self, ruta_sujetos = '../Base_de_Datos_Habla_Imaginada/', fs = 1024):
+        '''
+        Guarda todos los trials de todos los sujetos en una lista.
+        Cada elemento de esta lista tiene este formato:
+            (datos, etiquetas, sujeto)
+        Y datos, es un tensor de dimensiones:
+            (6, 4 x fs)
+        Naturalmente, fs = 1024, y los datos se usaran directamente
+        de como estan guardados. Pero si es menor, se cargaran y 
+        submuestrearan a la frecuencia indicada.
+        '''
+        self_trials = []
+        for sujeto in range(1, 16): # todos los sujetos
+            if sujeto < 10:
+                ruta = ruta_sujetos + f'S0{sujeto}/S0{sujeto}_EEG.mat'
+            else:
+                ruta = ruta_sujetos + f'S{sujeto}/S{sujeto}_EEG.mat'
+            # checkeo y carga
+            try:
+                data = sio.loadmat(ruta, squeeze_me = True, struct_as_record = False)
+            except FileNotFoundError:
+                raise FileNotFoundError(f'No se encontro el archivo en la ruta: {ruta}')
+            EEG = data['EEG']
+            # separando datos de etiquetas, y reshape de x
+            x = EEG[:, :-3]
+            x = x.reshape(-1, 6, 4096)
+            y = EEG[:, -3:]
+            # reviso fs para ver si busca submestrear
+            if fs != 1024:
+                x_ds = np.zeros((x.shape[0], x.shape[1], 4*fs))
+                for i in range(x.shape[0]):
+                    for j in range(x.shape[1]):
+                        x_ds[i, j, :] = decimate(x[i, j, :], 1024 // fs, ftype='iir', zero_phase=True)
+                x = x_ds
+            for i in range(x.shape[0]):
+                self_trials.append((torch.from_numpy(x[i]).float(), torch.from_numpy(y[i]).long(), sujeto))
+        self.trials = self_trials
+
+    def __len__(self):
+        return len(self.trials)
+
+    def __getitem__(self, idx):
+        x, y, sujeto = self.trials[idx]
+        return x, y, sujeto

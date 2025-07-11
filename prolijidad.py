@@ -82,7 +82,7 @@ def prueba_conversion_stft():
     datos = mbp.DataSetEEG(sujeto)
     f_max = 64
     t_ventana = 1024
-    n = 256
+    n = 2
     t_solapamiento = t_ventana*(n-1)/n
     fs = 1024
     datos.convertir_a_stft(f_max = f_max, t_ventana = t_ventana, t_solapamiento = t_solapamiento, fs = fs, aplanado = False)
@@ -93,7 +93,7 @@ def prueba_conversion_stft():
     azar = np.random.randint(0, len(datos))
     print(datos[azar][0].shape)
     plt.style.use('dark_background')
-    fig, ax = plt.subplots(3, 2, figsize=(18, 8))
+    fig, ax = plt.subplots(3, 2, figsize=(12, 8))
     for i in range(2):
         for j in range(3):
             idx = i*3 + j
@@ -869,6 +869,210 @@ def ajuste_fino_sobre_otro_sujeto ():
 
 ####################################################################################################################################
 ####################################################################################################################################
+# USO DE DWT
+# calculo las DWT, y visualizo la representacion
+####################################################################################################################################
+def DWT_visualizacion ():
+
+    import numpy as np
+    import torch
+    import buenas_practicas as mbp
+
+    # 1. Instanciar el dataset con fs_original=1024 Hz
+    dataset = mbp.DataSetEEG(sujeto=1)
+
+    print("Frecuencia inicial:", dataset.fs, "Hz")
+    print("Forma original de x:", dataset.x.shape)
+
+    # 2. Downsamplear por factor 8 → de 1024 Hz a 128 Hz
+    dataset.downsamplear(factor=8, nueva_fs=128)
+    print("Frecuencia tras downsampleo:", dataset.fs, "Hz")
+    print("Nueva forma de x:", dataset.x.shape)
+
+    # 3. Extraer energías wavelet usando la fs actual
+    ener = dataset.extraer_energias_wavelet(wavelet='db4', nivel=5)
+    print("Shape de energías (ensayos x 30):", ener.shape)
+    print("Primer vector de RWE:", ener[0])
+
+    # 4. Graficar reconstrucciones por banda del ensayo 0, canal 2
+    dataset.graficar_reconstrucciones_bandas(
+        ensayo=0,
+        canal=2,
+        wavelet='db4',
+        nivel=5
+    )
+
+    # 5. Graficar espectrograma DWT para el ensayo 0
+    dataset.graficar_espectrograma_wavelet(
+        ensayo=0,
+        wavelet='db4',
+        nivel=5
+    )
+
+    # 6. Convertir a tensores para PyTorch (features + etiquetas)
+    X = torch.from_numpy(ener).float()
+    y = torch.from_numpy(dataset.y).long()
+    print("Tamaño de X:", X.shape, "  y:", y.shape)
+
+####################################################################################################################################
+####################################################################################################################################
+# PREDICCION DTW + MLP
+# intento una prediccion con un mlp, con las energias por bandas de dwt
+####################################################################################################################################
+
+def mlp_dwt ():
+    import buenas_practicas as mbp
+    import numpy as np
+    import torch
+    from torch.utils.data import DataLoader
+    from torch import nn, optim
+
+    # 1. Cargar los datos y preparar el dataset
+    sujeto = 1
+    prediccion = 'estimulo' # Queremos predecir el tipo de estímulo
+    datos = mbp.DataSetEEG(sujeto)
+    datos.dejar_etiqueta(prediccion) # Asegurarse de que las etiquetas sean las correctas
+    datos_vocales, datos_comandos = datos.split_estimulo_datasets()
+
+    entrenamiento, validacion, prueba = datos_vocales.particionar(0.7, True, semilla=42)
+    
+    # ahora downsampleo y obtengo las features de energia por banda
+    # Aplicar downsampling y extracción de características DWT a cada subset
+    def transformar_subset_dwt(subset, fs_original=1024, factor_ds=8, nivel_dwt=5, wavelet='db4'):
+        # Crear un nuevo DataSetEEG temporal para el subset
+        # Esto es necesario porque downsamplear y extraer_energias_wavelet
+        # operan sobre las propiedades internas del objeto DataSetEEG
+        temp_dataset = mbp.DataSetEEG(sujeto=None)
+        temp_dataset.x = subset.dataset.x[subset.indices] # Obtener los datos del subset
+        temp_dataset.y = subset.dataset.y[subset.indices] # Obtener las etiquetas del subset
+        temp_dataset.fs = fs_original
+
+        temp_dataset.downsamplear(factor=factor_ds, nueva_fs=fs_original // factor_ds)
+        energias = temp_dataset.extraer_energias_wavelet(wavelet=wavelet, nivel=nivel_dwt)
+        
+        # Las etiquetas ya están en el formato correcto gracias a dejar_etiqueta
+        # y se mantienen al crear el subset.
+        etiquetas = torch.from_numpy(temp_dataset.y).long()
+        
+        return torch.from_numpy(energias).float(), etiquetas
+
+    print("Transformando datos de entrenamiento...")
+    X_train, y_train = transformar_subset_dwt(entrenamiento)
+    print("Transformando datos de validación...")
+    X_val, y_val = transformar_subset_dwt(validacion)
+    print("Transformando datos de prueba...")
+    X_test, y_test = transformar_subset_dwt(prueba)
+
+    # Crear TensorDatasets
+    entrenamiento_dwt = torch.utils.data.TensorDataset(X_train, y_train)
+    validacion_dwt = torch.utils.data.TensorDataset(X_val, y_val)
+    prueba_dwt = torch.utils.data.TensorDataset(X_test, y_test)
+
+    # Normalizar los datos (Min-Max Scaling)
+    # Calcular min y max solo en el conjunto de entrenamiento
+    min_val = X_train.min()
+    max_val = X_train.max()
+    def normalizar_tensor_dataset(dataset, min_val, max_val):
+        normalized_features = (dataset.tensors[0] - min_val) / (max_val - min_val)
+        return torch.utils.data.TensorDataset(normalized_features, dataset.tensors[1])
+
+    entrenamiento_dwt = normalizar_tensor_dataset(entrenamiento_dwt, min_val, max_val)
+    validacion_dwt = normalizar_tensor_dataset(validacion_dwt, min_val, max_val)
+    prueba_dwt = normalizar_tensor_dataset(prueba_dwt, min_val, max_val)
+
+    # 2. Definir la arquitectura del MLP
+    # La entrada será el número de características de energía (30 en este caso)
+    # La salida será el número de clases de estímulo (11: 5 vocales + 6 comandos)
+    input_dim = entrenamiento_dwt[0][0].shape[0] # 30
+    output_dim = 5
+
+    arq = [input_dim, 64, 64, 64, output_dim]
+    func_act = 'relu'
+    modelo = mbp.MLP(arq,
+                    func_act = func_act,
+                    usar_batch_norm = True,
+                    dropout = 0.05,
+                    metodo_init_pesos = nn.init.kaiming_normal_)
+
+    # 3. Configurar el entrenador
+    DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+    entrenador = mbp.Entrenador(modelo = modelo,
+                                optimizador = optim.AdamW(modelo.parameters(), lr = 1e-4, weight_decay = 1e-6),
+                                func_perdida = nn.CrossEntropyLoss(),
+                                device = DEVICE,
+                                parada_temprana = 100,
+                                log_dir = 'runs/mlp_dwt_estimulo')
+
+    # 4. Entrenar el modelo
+    batch_size = 64
+    cargador_entrenamiento = DataLoader(entrenamiento_dwt, batch_size = batch_size, shuffle = True, drop_last = False)
+    cargador_validacion = DataLoader(validacion_dwt, batch_size = batch_size, shuffle = True)
+
+    print("\nEntrenando el clasificador MLP con características DWT...")
+    entrenador.ajustar(cargador_entrenamiento = cargador_entrenamiento,
+                       cargador_validacion = cargador_validacion,
+                       epocas = 1000,
+                       nombre_modelo_salida = 'MLP_DWT_estimulo')
+
+    # 5. Evaluar el modelo
+    print("\nEvaluando el clasificador MLP con características DWT...")
+    cargador_prueba = DataLoader(prueba_dwt, batch_size = 1, shuffle = False)
+    evaluador = mbp.Evaluador(modelo = modelo, device = DEVICE, clases = 'estimulo')
+    evaluador.matriz_confusion(cargador_prueba)
+
+
+####################################################################################################################################
+####################################################################################################################################
+# DOWNSAMPLING DE DATOS
+# quiero ver que los datos downsampleados de la forma de carga nueva, esten bien
+####################################################################################################################################
+
+def nuevo_dataset_downsampleado ():
+    import buenas_practicas as mbp
+    import numpy as np
+    import torch
+    import matplotlib.pyplot as plt
+
+    sujeto = 1
+    datos = mbp.DataSetEEG(sujeto)
+
+    datos_nuevos = mbp.DataSetEEGCompleto(fs = 128)
+
+    # quiero graficar en una misma figura, un trial, de un canal de ambos datasets
+    # Seleccionar un ensayo y un canal al azar
+    ensayo_idx = np.random.randint(0, len(datos))
+    canal_idx = np.random.randint(0, 6)
+
+    # Obtener los datos del DataSetEEG original
+    x_original = datos.x[ensayo_idx, 4096*canal_idx : 4096*(canal_idx+1)]
+    t_original = np.arange(len(x_original)) / 1024
+
+    # Obtener los datos del DataSetEEGCoompleto (ya downsampleado)
+    x_nuevo = datos_nuevos.x[ensayo_idx, canal_idx, :]
+    t_nuevo = np.arange(len(x_nuevo)) / datos_nuevos.fs
+
+    plt.style.use('dark_background')
+    plt.subplot(2, 1, 1)
+    plt.plot(t_original, x_original, color='dodgerblue', label='Original')
+    plt.title(f'Ensayo {ensayo_idx}, Canal {canal_idx} (Original)')
+    plt.xlabel('Tiempo (s)')
+    plt.ylabel('Amplitud')
+    plt.legend()
+    plt.grid(linewidth=0.2)
+
+    plt.subplot(2, 1, 2)
+    plt.plot(t_nuevo, x_nuevo, color='orange', label='Downsampleado')
+    plt.title(f'Ensayo {ensayo_idx}, Canal {canal_idx} (Downsampleado)')
+    plt.xlabel('Tiempo (s)')
+    plt.ylabel('Amplitud')
+    plt.legend()
+    plt.grid(linewidth=0.2)
+
+    plt.tight_layout()
+    plt.show()
+
+####################################################################################################################################
+####################################################################################################################################
 # correr
 
 if __name__ == '__main__':
@@ -876,8 +1080,11 @@ if __name__ == '__main__':
     #cargar_AE_entrenado()
     #prueba_prediccion_estimulo()
     #AE_MLP_clasificador()
-    AE_otro_sujeto('ae_sujeto2_4096_ajuste_fino', True)
+    #AE_otro_sujeto('ae_sujeto2_4096_ajuste_fino', True)
     #probar_MLP_entrenado()
     #ajuste_fino_sobre_otro_sujeto()
+    #DWT_visualizacion()
+    #mlp_dwt()
+    nuevo_dataset_downsampleado()
 
 ####################################################################################################################################
