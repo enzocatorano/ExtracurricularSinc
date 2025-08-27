@@ -468,7 +468,7 @@ def AE_MLP_clasificador ():
 ####################################################################################################################################
 ####################################################################################################################################
 # AE EN OTRO SUJETO
-# cargamos el AE entrenado sobre el sujeto 1, para probarlo en los datos del sujero 2
+# cargamos el AE entrenado sobre el sujeto 1, para probarlo en los datos del sujeto 2
 ####################################################################################################################################
 def AE_otro_sujeto (nombre_archivo_modelo, graficar):
     import buenas_practicas as mbp
@@ -895,12 +895,12 @@ def DWT_visualizacion ():
     print("Primer vector de RWE:", ener[0])
 
     # 4. Graficar reconstrucciones por banda del ensayo 0, canal 2
-    dataset.graficar_reconstrucciones_bandas(
-        ensayo=0,
-        canal=2,
-        wavelet='db4',
-        nivel=5
-    )
+    # dataset.graficar_reconstrucciones_bandas(
+    #     ensayo=0,
+    #     canal=2,
+    #     wavelet='db4',
+    #     nivel=5
+    # )
 
     # 5. Graficar espectrograma DWT para el ensayo 0
     dataset.graficar_espectrograma_wavelet(
@@ -1083,8 +1083,8 @@ if __name__ == '__main__':
     #AE_otro_sujeto('ae_sujeto2_4096_ajuste_fino', True)
     #probar_MLP_entrenado()
     #ajuste_fino_sobre_otro_sujeto()
-    #DWT_visualizacion()
+    DWT_visualizacion()
     #mlp_dwt()
-    nuevo_dataset_downsampleado()
+    #nuevo_dataset_downsampleado()
 
 ####################################################################################################################################

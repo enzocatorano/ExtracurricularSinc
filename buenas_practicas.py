@@ -724,6 +724,7 @@ class DataSetEEG (Dataset):
         self.x = datos_ds
         self.fs = nueva_fs
 
+
     def extraer_energias_wavelet(self, ondata=None, wavelet='db4', nivel=5, frecuencia_muestreo=None):
         '''
         Calcula las energías relativas (RWE) para cada ensayo y canal.
@@ -749,6 +750,7 @@ class DataSetEEG (Dataset):
                 feats.extend(rwe_sel)
             energias[i] = np.array(feats)
         return energias
+
 
     def graficar_reconstrucciones_bandas(self, ensayo, canal, wavelet='db4', nivel=5, frecuencia_muestreo=None):
         '''
@@ -777,29 +779,109 @@ class DataSetEEG (Dataset):
         plt.tight_layout()
         plt.show()
 
+
     def graficar_espectrograma_wavelet(self, ensayo, wavelet='db4', nivel=5, frecuencia_muestreo=None):
-        '''
-        Grafica un "espectrograma" DWT con bloques de coeficientes para los 6 canales.
-        frecuencia_muestreo: sampling rate en Hz, por si hay downsampling previo.
-        '''
-        fs = frecuencia_muestreo if frecuencia_muestreo is not None else self.fs
-        datos = self.x[ensayo]
-        n_canales = 6
-        largo = datos.size // n_canales
-        fig, axes = plt.subplots(n_canales, 1, figsize=(8, 12))
-        for ch in range(n_canales):
-            señal = datos[ch*largo:(ch+1)*largo]
-            coeffs = pywt.wavedec(señal, wavelet, level=nivel)
-            bloques = coeffs[::-1]
-            max_len = max(len(b) for b in bloques)
-            mat = np.zeros((len(bloques), max_len))
-            for i, b in enumerate(bloques):
-                mat[i, :len(b)] = np.abs(b)
-            axes[ch].imshow(mat, aspect='auto', origin='lower')
-            axes[ch].set_title(f'Canal {ch} (Ensayo {ensayo})')
-            axes[ch].set_ylabel('Nivel')
-        axes[-1].set_xlabel('Coeficiente index')
-        plt.tight_layout()
+        """
+        Grafica un "espectrograma" DWT con eje vertical en Hz (lineal), 
+        rellenando bloques según su ancho de banda.
+
+        Parámetros
+        ----------
+        ensayo : int
+            Índice del ensayo en self.x
+        wavelet : str
+            Nombre de la wavelet
+        nivel : int
+            Nivel de descomposición DWT deseado
+        frecuencia_muestreo : float or None
+            Sampling rate en Hz. Si None, usa self.fs.
+        """
+
+        fs = frecuencia_muestreo if frecuencia_muestreo is not None else getattr(self, 'fs', None)
+        if fs is None:
+            raise ValueError("No se encontró frecuencia de muestreo. Pasá frecuencia_muestreo o definí self.fs.")
+
+        datos = np.asarray(self.x[ensayo]).ravel()
+        muestras_por_canal = int(round(4 * fs))
+        esperado = 6 * muestras_por_canal
+        if datos.size != esperado:
+            if datos.size % 6 == 0:
+                muestras_por_canal = datos.size // 6
+            else:
+                min_len = min(datos.size, esperado)
+                datos = datos[:min_len]
+                muestras_por_canal = min_len // 6
+                print(f"[warning] longitud inesperada. Ajusté muestras_por_canal a {muestras_por_canal}.")
+
+        canales = [datos[i*muestras_por_canal:(i+1)*muestras_por_canal] for i in range(6)]
+
+        fig, axes = plt.subplots(3, 2, figsize=(8, 9), sharex=True, sharey=True)
+
+        w = pywt.Wavelet(wavelet)
+        max_lvl = pywt.dwt_max_level(data_len=muestras_por_canal, filter_len=w.dec_len)
+        nivel = min(nivel, max_lvl)
+
+        dur = muestras_por_canal / float(fs)
+
+        for ch_idx, ch in enumerate(canales):
+            ax = axes[ch_idx // 2, ch_idx % 2]
+
+            coeffs = pywt.wavedec(ch, wavelet, level=nivel)
+
+            N = len(ch)
+            bloques = []
+            bandas = []
+
+            for idx, c in enumerate(coeffs):
+                Lc = len(c)
+                if Lc == 0:
+                    reped = np.zeros(N)
+                else:
+                    rep_factor = int(np.ceil(N / Lc))
+                    reped = np.repeat(c, rep_factor)[:N]
+                bloques.append(reped)
+
+                if idx == 0:  # aproximación
+                    low, high = 0.0, fs / (2.0**(nivel+1))
+                else:
+                    j = nivel - (idx - 1)
+                    low, high = fs/(2.0**(j+1)), fs/(2.0**j)
+                bandas.append((low, high))
+
+            # ahora "estiramos" verticalmente según el ancho en Hz de cada banda
+            factor_pixeles = 2  # cuanto más grande, más resolución vertical
+            M_r = []
+            y_ticks = []
+            y_labels = []
+            for fila, (low, high) in zip(bloques, bandas):
+                reps = int(round((high-low) * factor_pixeles))
+                if reps < 1: reps = 1
+                M_r.append(np.repeat(fila[np.newaxis,:], reps, axis=0))
+
+                y_ticks.append((low+high)/2)
+                y_labels.append(f"{int(low)}–{int(high)} Hz")
+
+            M_r = np.vstack(M_r)
+            M_vis = np.log1p(np.abs(M_r))
+
+            im = ax.imshow(M_vis, aspect='auto', origin='lower',
+                        extent=[0, dur, 0, fs/2],
+                        interpolation='nearest')
+
+            ax.set_title(f"Canal {ch_idx+1}")
+            ax.set_xlabel("Tiempo (s)")
+            if ch_idx % 2 == 0:
+                ax.set_ylabel("Frecuencia (Hz)")
+
+        fig.suptitle(f"Espectrograma DWT — wavelet={wavelet}, nivel={nivel}, fs={fs} Hz",
+                     y=0.975)
+
+        plt.tight_layout(rect=[0, 0.05, 1, 1])  # dejo espacio abajo (0.05)
+
+        cbar_ax = fig.add_axes([0.15, 0.03, 0.7, 0.025])  # [x, y, width, height]
+        cbar = fig.colorbar(im, cax=cbar_ax, orientation='horizontal')
+        cbar.set_label('log1p(|coef|)')
+
         plt.show()
 
 

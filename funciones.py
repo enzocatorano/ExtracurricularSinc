@@ -279,7 +279,7 @@ def calcular_stft(signal, fs = 1024, window = 'hann', nperseg = 256, noverlap = 
     - t: tiempos
     - Zxx: matriz de STFT (espectrograma complejo)
     """
-    f, t, Zxx = stft(signal, fs = fs, window = window, nperseg = nperseg, noverlap = noverlap)
+    f, t, Zxx = stft(signal, fs = fs, window = window, nperseg = nperseg, noverlap = noverlap, )
     return f, t, Zxx
 
 def convertir_a_stft(datos, fs = 1024, window = 'hann', nperseg = 256, noverlap = 128):
