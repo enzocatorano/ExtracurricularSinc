@@ -19,7 +19,7 @@ import copy
 import scipy.io as sio
 import mne
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import confusion_matrix, classification_report, accuracy_score
 from scipy.signal import stft, decimate
 import pywt
 
@@ -135,7 +135,7 @@ class MLP (nn.Module):
             if isinstance(mod, nn.Linear):
                 metodo_init_pesos(mod.weight)
                 if mod.bias is not None:
-                    nn.init.zeros_(mod.bias)
+                    nn.init.normal_(mod.bias, mean=0.0, std=0.01)
     #########################################################################
 
     def __str__(self):
@@ -424,13 +424,24 @@ class Evaluador ():
         return cm
     
 
-    def reporte(self, dataloader):
+    def reporte(self, dataloader, retornar_metricas=False):
         verdaderas, preds = self.probar(dataloader)
+        rep = classification_report(
+            verdaderas, preds,
+            target_names=self.nombres_clases if self.nombres_clases else None,
+            digits=3,
+            output_dict=True if retornar_metricas else False
+        )
         print(classification_report(
             verdaderas, preds,
-            target_names = self.nombres_clases if self.nombres_clases else None,
+            target_names=self.nombres_clases if self.nombres_clases else None,
             digits=3
         ))
+        
+        if retornar_metricas:
+            acc = accuracy_score(verdaderas, preds)
+            return rep, acc
+
 
 ############################################################################################################
 ############################################################################################################
@@ -742,39 +753,75 @@ class DataSetEEG (Dataset):
                 canal = vect[ch*largo:(ch+1)*largo]
                 coeffs = pywt.wavedec(canal, wavelet, level=nivel)
                 coeffs_rev = coeffs[::-1]
+                # descartamos la banda d1
+                coeffs_rev = coeffs_rev[1:]
                 E = np.array([np.sum(c**2) for c in coeffs_rev])
                 Et = E.sum()
                 rwe = E / Et
-                # descartamos la banda d1
-                rwe_sel = rwe[1:]
-                feats.extend(rwe_sel)
+                feats.extend(rwe)
             energias[i] = np.array(feats)
         return energias
 
 
     def graficar_reconstrucciones_bandas(self, ensayo, canal, wavelet='db4', nivel=5, frecuencia_muestreo=None):
-        '''
-        Grafica la señal original y las reconstrucciones por banda para un ensayo y canal.
-        frecuencia_muestreo: sampling rate en Hz, por si hay downsampling previo.
-        '''
+        import pywt, numpy as np, matplotlib.pyplot as plt
+
+        # fs
         fs = frecuencia_muestreo if frecuencia_muestreo is not None else self.fs
+
+        # extraer bloque de canal (asume 6 canales concatenados)
         datos = self.x[ensayo]
+        if datos.size % 6 != 0:
+            raise ValueError("Se espera que cada ensayo tenga 6 canales concatenados (size divisible por 6).")
         largo = datos.size // 6
+        if not (0 <= canal < 6):
+            raise IndexError("canal debe estar en 0..5")
         señal = datos[canal*largo:(canal+1)*largo]
+
+        # chequeo de nivel máximo válido
+        max_lvl = pywt.dwt_max_level(len(señal), pywt.Wavelet(wavelet).dec_len)
+        if nivel > max_lvl:
+            raise ValueError(f"nivel demasiado alto para la señal; max permitido: {max_lvl}")
+
+        # descomposición
         coeffs = pywt.wavedec(señal, wavelet, level=nivel)
+        # coeffs = [cA_n, cD_n, cD_{n-1}, ..., cD_1]
+
         t = np.arange(len(señal)) / fs
-        n_plots = nivel + 1
-        fig, axes = plt.subplots(n_plots, 1, figsize=(16, 1.5*n_plots), sharex = True)
+
+        # plots: 1 original + una fila por cada conjunto de coeficientes (A_n + D_n..D1)
+        n_bandas = len(coeffs)                # n+1
+        n_plots = 1 + n_bandas                # original + (A_n + D_n..D1)
+        fig, axes = plt.subplots(n_plots, 1, figsize=(8, 1.2*n_plots), sharex=True)
+
+        # señal original
         axes[0].plot(t, señal)
         axes[0].set_title(f'Ensayo {ensayo}, Canal {canal}: señal original')
-        for j in range(1, nivel+1):
+
+        idx = 1
+
+        # -------------------------
+        # reconstrucción de la aproximación (coeffs[0] = cA_n)
+        coeffs_band = [np.zeros_like(c) for c in coeffs]
+        coeffs_band[0] = coeffs[0]
+        rec = pywt.waverec(coeffs_band, wavelet)
+        L = min(len(t), len(rec))
+        axes[idx].plot(t[:L], rec[:L])
+        axes[idx].set_title(f'Aproximación A{nivel} (cA_{nivel})')
+        idx += 1
+
+        # -------------------------
+        # reconstrucciones de los detalles: coeffs[1]=cD_n ... coeffs[n]=cD_1
+        for j in range(1, len(coeffs)):
             coeffs_band = [np.zeros_like(c) for c in coeffs]
             coeffs_band[j] = coeffs[j]
             rec = pywt.waverec(coeffs_band, wavelet)
-            axes[j].plot(t, rec[:len(t)])
-            nombre = 'a' if j == nivel else 'd'
-            nivel_idx = nivel - j + 1
-            axes[j].set_title(f'Banda {nombre}{nivel_idx}')
+            L = min(len(t), len(rec))
+            level_detail = nivel - j + 1   # mapea j -> D_level (1..nivel)
+            axes[idx].plot(t[:L], rec[:L])
+            axes[idx].set_title(f'Detalle D{level_detail} (cD_{level_detail})')
+            idx += 1
+
         plt.xlabel('Tiempo (s)')
         plt.tight_layout()
         plt.show()

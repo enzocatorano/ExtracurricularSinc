@@ -895,12 +895,12 @@ def DWT_visualizacion ():
     print("Primer vector de RWE:", ener[0])
 
     # 4. Graficar reconstrucciones por banda del ensayo 0, canal 2
-    # dataset.graficar_reconstrucciones_bandas(
-    #     ensayo=0,
-    #     canal=2,
-    #     wavelet='db4',
-    #     nivel=5
-    # )
+    dataset.graficar_reconstrucciones_bandas(
+        ensayo=0,
+        canal=2,
+        wavelet='db4',
+        nivel=5
+    )
 
     # 5. Graficar espectrograma DWT para el ensayo 0
     dataset.graficar_espectrograma_wavelet(
@@ -934,7 +934,7 @@ def mlp_dwt ():
     datos.dejar_etiqueta(prediccion) # Asegurarse de que las etiquetas sean las correctas
     datos_vocales, datos_comandos = datos.split_estimulo_datasets()
 
-    entrenamiento, validacion, prueba = datos_vocales.particionar(0.7, True, semilla=42)
+    entrenamiento, validacion, prueba = datos_vocales.particionar(0.7, True, semilla=None)
     
     # ahora downsampleo y obtengo las features de energia por banda
     # Aplicar downsampling y extracción de características DWT a cada subset
@@ -980,13 +980,16 @@ def mlp_dwt ():
     validacion_dwt = normalizar_tensor_dataset(validacion_dwt, min_val, max_val)
     prueba_dwt = normalizar_tensor_dataset(prueba_dwt, min_val, max_val)
 
+    # printeo un vector de caracteristicas y su etiqueta
+    print(entrenamiento_dwt[0])
+
     # 2. Definir la arquitectura del MLP
     # La entrada será el número de características de energía (30 en este caso)
     # La salida será el número de clases de estímulo (11: 5 vocales + 6 comandos)
     input_dim = entrenamiento_dwt[0][0].shape[0] # 30
     output_dim = 5
 
-    arq = [input_dim, 64, 64, 64, output_dim]
+    arq = [input_dim, 128, 256, 128, output_dim]
     func_act = 'relu'
     modelo = mbp.MLP(arq,
                     func_act = func_act,
@@ -997,14 +1000,14 @@ def mlp_dwt ():
     # 3. Configurar el entrenador
     DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
     entrenador = mbp.Entrenador(modelo = modelo,
-                                optimizador = optim.AdamW(modelo.parameters(), lr = 1e-4, weight_decay = 1e-6),
+                                optimizador = optim.AdamW(modelo.parameters(), lr = 1e-4, weight_decay = 0),
                                 func_perdida = nn.CrossEntropyLoss(),
                                 device = DEVICE,
                                 parada_temprana = 100,
-                                log_dir = 'runs/mlp_dwt_estimulo')
-
+                                log_dir = 'runs/pruebas_reporte_dwt2')
+ 
     # 4. Entrenar el modelo
-    batch_size = 64
+    batch_size = 9
     cargador_entrenamiento = DataLoader(entrenamiento_dwt, batch_size = batch_size, shuffle = True, drop_last = False)
     cargador_validacion = DataLoader(validacion_dwt, batch_size = batch_size, shuffle = True)
 
@@ -1017,8 +1020,10 @@ def mlp_dwt ():
     # 5. Evaluar el modelo
     print("\nEvaluando el clasificador MLP con características DWT...")
     cargador_prueba = DataLoader(prueba_dwt, batch_size = 1, shuffle = False)
-    evaluador = mbp.Evaluador(modelo = modelo, device = DEVICE, clases = 'estimulo')
+    evaluador = mbp.Evaluador(modelo = modelo, device = DEVICE, clases = 'estimulo_vocal')
+    evaluador.reporte(cargador_prueba)
     evaluador.matriz_confusion(cargador_prueba)
+    #evaluador.reporte(cargador_validacion)
 
 
 ####################################################################################################################################
@@ -1071,6 +1076,209 @@ def nuevo_dataset_downsampleado ():
     plt.tight_layout()
     plt.show()
 
+
+####################################################################################################################################
+####################################################################################################################################
+# REGISTRO MLP+DWT
+# corro los experimentos para resultados finales usando energias de DWT en MLPs
+####################################################################################################################################
+
+def registro_mlp_dwt ():
+    import torch
+    from torch import nn, optim
+    from torch.utils.data import DataLoader
+    import numpy as np
+    import buenas_practicas as mbp
+    import random
+    import os
+
+    # ------------------------------------------------------
+    # Función para correr un experimento sobre un sujeto
+    # ------------------------------------------------------
+    def correr_experimento(sujeto, tipo_estimulo, seed=None):
+        """
+        Corre un entrenamiento + evaluación sobre un sujeto y tipo de estímulo ('vocales' o 'comandos').
+        Devuelve la precisión en el set de prueba.
+        """
+        # Semilla aleatoria
+        if seed is not None:
+            torch.manual_seed(seed)
+            np.random.seed(seed)
+            random.seed(seed)
+
+        # Cargar datos
+        prediccion = 'estimulo'
+        datos = mbp.DataSetEEG(sujeto)
+        datos.dejar_etiqueta(prediccion)
+        datos_vocales, datos_comandos = datos.split_estimulo_datasets()
+
+        if tipo_estimulo == 'vocales':
+            dataset = datos_vocales
+            output_dim = 5
+        elif tipo_estimulo == 'comandos':
+            dataset = datos_comandos
+            output_dim = 6
+        else:
+            raise ValueError("tipo_estimulo debe ser 'vocales' o 'comandos'")
+
+        # Partición
+        entrenamiento, validacion, prueba = dataset.particionar(0.7, True, semilla=None)
+
+        # Función para transformar subset
+        def transformar_subset_dwt(subset, fs_original=1024, factor_ds=8, nivel_dwt=5, wavelet='db4'):
+            temp_dataset = mbp.DataSetEEG(sujeto=None)
+            temp_dataset.x = subset.dataset.x[subset.indices]
+            temp_dataset.y = subset.dataset.y[subset.indices]
+            temp_dataset.fs = fs_original
+
+            temp_dataset.downsamplear(factor=factor_ds, nueva_fs=fs_original // factor_ds)
+            energias = temp_dataset.extraer_energias_wavelet(wavelet=wavelet, nivel=nivel_dwt)
+
+            etiquetas = torch.from_numpy(temp_dataset.y).long()
+            return torch.from_numpy(energias).float(), etiquetas
+
+        # Transformar
+        X_train, y_train = transformar_subset_dwt(entrenamiento)
+        X_val, y_val = transformar_subset_dwt(validacion)
+        X_test, y_test = transformar_subset_dwt(prueba)
+
+        # Normalizar
+        min_val, max_val = X_train.min(), X_train.max()
+        def normalizar_tensor_dataset(X, y, min_val, max_val):
+            return (X - min_val) / (max_val - min_val), y
+        X_train, y_train = normalizar_tensor_dataset(X_train, y_train, min_val, max_val)
+        X_val, y_val = normalizar_tensor_dataset(X_val, y_val, min_val, max_val)
+        X_test, y_test = normalizar_tensor_dataset(X_test, y_test, min_val, max_val)
+
+        entrenamiento_dwt = torch.utils.data.TensorDataset(X_train, y_train)
+        validacion_dwt = torch.utils.data.TensorDataset(X_val, y_val)
+        prueba_dwt = torch.utils.data.TensorDataset(X_test, y_test)
+
+        # Modelo
+        input_dim = X_train.shape[1]
+        arq = [input_dim, 128, 256, 128, output_dim]
+        modelo = mbp.MLP(arq,
+                        func_act='relu',
+                        usar_batch_norm=True,
+                        dropout=0.05,
+                        metodo_init_pesos=nn.init.kaiming_normal_)
+
+        # Entrenador
+        DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
+        entrenador = mbp.Entrenador(modelo=modelo,
+                                    optimizador=optim.AdamW(modelo.parameters(), lr=1e-4, weight_decay=0),
+                                    func_perdida=nn.CrossEntropyLoss(),
+                                    device=DEVICE,
+                                    parada_temprana=100,
+                                    log_dir='runs_finales3/pruebas_reporte_dwt')
+
+        # Entrenar
+        batch_size = 9
+        cargador_entrenamiento = DataLoader(entrenamiento_dwt, batch_size=batch_size, shuffle=True, drop_last=True)
+        cargador_validacion = DataLoader(validacion_dwt, batch_size=batch_size, shuffle=True)
+        entrenador.ajustar(cargador_entrenamiento, cargador_validacion, epocas=1000)
+
+        # Evaluar
+        cargador_prueba = DataLoader(prueba_dwt, batch_size=1, shuffle=False)
+        evaluador = mbp.Evaluador(modelo=modelo, device=DEVICE, clases='estimulo_vocal' if tipo_estimulo=='vocales' else 'estimulo_comando')
+        perdida, precision = evaluador.reporte(cargador_prueba, retornar_metricas=True)
+
+        return precision
+    
+    ##################################################################################################
+    # Resultados: { sujeto: { tipo_estimulo: [precisiones...] } }
+    resultados = {}
+
+    for sujeto in range(1, 16):  # 15 sujetos numerados del 1 al 15
+        resultados[sujeto] = {}
+        for tipo in ['vocales', 'comandos']:
+            resultados[sujeto][tipo] = []
+            for intento in range(10):   # cantidad de experimentos
+                seed = random.randint(0, 1000000)  # semilla aleatoria
+                print(f"\n>>> Sujeto {sujeto} | Estímulo: {tipo} | Intento {intento+1} | Seed={seed}")
+                precision = correr_experimento(sujeto, tipo, seed=seed)
+                resultados[sujeto][tipo].append(precision)
+
+    # Guardar resultados en un archivo para análisis posterior
+    import json
+    with open("resultados_experimentos3.json", "w") as f:
+        json.dump(resultados, f, indent=4)
+
+
+####################################################################################################################################
+####################################################################################################################################
+# RESULTADOS DWT+MLP
+# analizo y visualizo los resultados obtenidos
+####################################################################################################################################
+
+def resultados_dwt_mlp():
+
+    import json
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # Cargar archivo JSON (asegurate de poner el path correcto)
+    with open("resultados_experimentos.json", "r") as f:
+        resultados = json.load(f)
+
+    # Extraer promedios y desviaciones por sujeto
+    sujetos = []
+    promedios_vocales = []
+    desvios_vocales = []
+    promedios_comandos = []
+    desvios_comandos = []
+
+    for sujeto, datos in resultados.items():
+        sujetos.append(int(sujeto))
+        vocales = datos["vocales"]
+        comandos = datos["comandos"]
+        promedios_vocales.append(np.mean(vocales))
+        desvios_vocales.append(np.std(vocales))
+        promedios_comandos.append(np.mean(comandos))
+        desvios_comandos.append(np.std(comandos))
+
+    sujetos = np.array(sujetos)
+
+    # Valores de azar
+    azar_vocales = 1/5  # 5 clases de vocales
+    azar_comandos = 1/6  # 6 clases de comandos
+
+    # Convertir todas las precisiones a arrays de NumPy
+    todas_vocales = np.concatenate([resultados[s]["vocales"] for s in resultados])
+    todas_comandos = np.concatenate([resultados[s]["comandos"] for s in resultados])
+
+    # Calcular media y desviación estándar global
+    media_vocales = np.mean(todas_vocales)
+    desvio_vocales = np.std(todas_vocales)
+
+    media_comandos = np.mean(todas_comandos)
+    desvio_comandos = np.std(todas_comandos)
+
+    print(f"Vocales - Precisión media global: {media_vocales:.4f}, Desviación estándar: {desvio_vocales:.4f}")
+    print(f"Comandos - Precisión media global: {media_comandos:.4f}, Desviación estándar: {desvio_comandos:.4f}")
+
+    # Graficar
+    fig, axes = plt.subplots(1, 2, figsize=(14,6), sharey=True)
+
+    # Gráfico vocales
+    axes[0].bar(sujetos, promedios_vocales, yerr=desvios_vocales, capsize=5, alpha=0.7)
+    axes[0].axhline(azar_vocales, color="r", linestyle="--", label="Azar (1/5)")
+    axes[0].set_title("Precisión en Vocales por Sujeto")
+    axes[0].set_xlabel("Sujeto")
+    axes[0].set_ylabel("Precisión")
+    axes[0].legend()
+
+    # Gráfico comandos
+    axes[1].bar(sujetos, promedios_comandos, yerr=desvios_comandos, capsize=5, alpha=0.7, color="orange")
+    axes[1].axhline(azar_comandos, color="r", linestyle="--", label="Azar (1/6)")
+    axes[1].set_title("Precisión en Comandos por Sujeto")
+    axes[1].set_xlabel("Sujeto")
+    axes[1].legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
 ####################################################################################################################################
 ####################################################################################################################################
 # correr
@@ -1086,5 +1294,8 @@ if __name__ == '__main__':
     DWT_visualizacion()
     #mlp_dwt()
     #nuevo_dataset_downsampleado()
+    #registro_mlp_dwt()
+    #resultados_dwt_mlp()
+
 
 ####################################################################################################################################
